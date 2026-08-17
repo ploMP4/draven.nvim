@@ -14,7 +14,8 @@ hunks survive and only the changed one goes stale.
 
 > The full loop works: read the diff, leave findings, send them to the agent,
 > and on the next pass only what actually changed comes back — with your
-> findings still attached to the lines they were written about.
+> findings still attached to the lines they were written about. `:help draven`
+> covers the rest.
 
 ## Requirements
 
@@ -296,8 +297,16 @@ lua/draven/
 └── util/                 async runtime, fs, glob, log
 ```
 
-Opening a 257-file, 607-hunk changeset takes ~140 ms; marking a hunk with a
-full panel repaint takes ~10 ms.
+Measured on nvim-treesitter `HEAD~300..HEAD` — 257 files, 607 hunks:
+
+| | |
+| --- | --- |
+| open the review | 170 ms |
+| mark a hunk, with a full panel repaint | 6 ms |
+| `<leader>ra` (mark all 607) | 630 ms |
+
+`mark_all` is the outlier: it writes one snapshot per approved hunk. It is a
+bulk escape hatch, not part of the normal loop.
 
 ## Development
 
