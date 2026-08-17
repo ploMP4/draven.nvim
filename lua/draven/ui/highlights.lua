@@ -18,6 +18,11 @@ local LINKS = {
 	DravenSignAdd = "DiffAdd",
 	DravenSignDelete = "DiffDelete",
 
+	-- Inline diff markers, in the first cells of the text area
+	DravenMarkerAdd = "DiffAdd",
+	DravenMarkerDelete = "DiffDelete",
+	DravenMarkerContext = "Normal",
+
 	-- Findings
 	DravenFindingBlocking = "DiagnosticError",
 	DravenFindingQuestion = "DiagnosticWarn",

@@ -70,16 +70,16 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 	local total = line_count(bufnr)
 	lnum = math.max(1, math.min(lnum, total))
 
-	local gutter = ("%-2s"):format(signs.hunk)
+	-- Virtual lines begin at the text area, and added lines carry an inline
+	-- marker in that same first cell, so the two columns line up.
 	local marker = ("%-2s"):format(signs.delete)
-	local indent = vim.fn.strdisplaywidth(gutter .. marker)
+	local indent = vim.fn.strdisplaywidth(marker)
 
 	local virt_lines = {}
 	for i, text in ipairs(texts) do
 		local pad = math.max(0, width - indent - vim.fn.strdisplaywidth(text))
 		virt_lines[i] = {
-			{ gutter, "DravenSignBar" },
-			{ marker, "DravenSignDelete" },
+			{ marker, "DravenMarkerDelete" },
 			{ text .. string.rep(" ", pad), "DravenDelete" },
 		}
 	end
@@ -91,8 +91,8 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 	})
 end
 
----Place a sign. Higher priority sits further left, so review state stays in
----the first slot and the +/- marker in the second.
+---Place a sign. The sign column carries review state only; the diff markers
+---live inline so they align with the virtual lines that show deletions.
 ---@param bufnr integer
 ---@param lnum integer
 ---@param text string
@@ -107,6 +107,25 @@ local function sign(bufnr, lnum, text, group, priority)
 		sign_text = text,
 		sign_hl_group = group,
 		priority = priority or 120,
+	})
+end
+
+---A two-cell marker at the very start of the text, in the same column a
+---deleted line's marker occupies.
+---@param bufnr integer
+---@param lnum integer
+---@param text string
+---@param group string
+local function inline_marker(bufnr, lnum, text, group)
+	if lnum < 1 or lnum > line_count(bufnr) then
+		return
+	end
+
+	pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, lnum - 1, 0, {
+		virt_text = { { text, group } },
+		virt_text_pos = "inline",
+		right_gravity = false,
+		priority = 105,
 	})
 end
 
@@ -140,13 +159,13 @@ local function render_hunk(bufnr, hunk, status, width)
 	local deletes = {}
 	local last_seen = nil
 
+	local add_marker = ("%-2s"):format(signs.add)
+
 	local function flush_adds()
 		if add_first then
 			highlight_range(bufnr, add_first, add_last, "DravenAdd")
-			-- A `+` in the second sign slot, so an added line reads as added
-			-- without relying on the background alone.
 			for lnum = add_first, add_last do
-				sign(bufnr, lnum, signs.add, "DravenSignAdd", 110)
+				inline_marker(bufnr, lnum, add_marker, "DravenMarkerAdd")
 			end
 			add_first, add_last = nil, nil
 		end
@@ -203,6 +222,15 @@ local function render_hunk(bufnr, hunk, status, width)
 
 	for lnum = first + 1, last do
 		sign(bufnr, lnum, signs.hunk, "DravenSignBar")
+	end
+
+	-- Unchanged lines inside the hunk get the same two cells, so the marker
+	-- column is straight rather than staggered.
+	local blank = string.rep(" ", vim.fn.strdisplaywidth(add_marker))
+	for _, line in ipairs(hunk.lines) do
+		if line.kind == "context" and line.new_lnum then
+			inline_marker(bufnr, line.new_lnum, blank, "DravenMarkerContext")
+		end
 	end
 end
 
