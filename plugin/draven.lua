@@ -60,6 +60,15 @@ vim.api.nvim_create_user_command("DravenFindings", function()
 	require("draven").findings()
 end, { desc = "Load the review's findings into the quickfix list" })
 
+vim.api.nvim_create_user_command("DravenReset", function(cmd)
+	require("draven").reset({ rev = cmd.args, force = cmd.bang })
+end, {
+	nargs = "?",
+	bang = true,
+	complete = complete_rev,
+	desc = "Discard a review's marks and findings (! to skip the prompt)",
+})
+
 vim.api.nvim_create_user_command("DravenStatus", function(cmd)
 	require("draven").status(cmd.args, { verbose = cmd.bang })
 end, {

@@ -211,13 +211,23 @@ function M.prune_snapshots(cs, state)
 	return removed
 end
 
----Forget a changeset's state entirely.
+---Forget a changeset's state entirely: marks, findings and snapshots.
 ---@param cs draven.Changeset
+---@return boolean existed
 function M.delete(cs)
 	local path = M.path(cs)
-	if vim.fn.filereadable(path) == 1 then
+	local existed = vim.fn.filereadable(path) == 1
+
+	if existed then
 		vim.fn.delete(path)
 	end
+
+	local snapshots = M.snapshot_dir(cs)
+	if vim.fn.isdirectory(snapshots) == 1 then
+		vim.fn.delete(snapshots, "rf")
+	end
+
+	return existed
 end
 
 return M

@@ -9,8 +9,6 @@ local LINKS = {
 	-- Diff body
 	DravenAdd = "DiffAdd",
 	DravenDelete = "DiffDelete",
-	DravenChange = "DiffChange",
-	DravenDeleteText = "DiffDelete",
 
 	-- Sign column
 	DravenSignReviewed = "DiagnosticOk",
@@ -23,7 +21,6 @@ local LINKS = {
 	DravenFindingQuestion = "DiagnosticWarn",
 	DravenFindingNit = "DiagnosticHint",
 	DravenFindingResolved = "NonText",
-	DravenFindingOrphaned = "NonText",
 
 	-- The v1→v2 delta
 	DravenDeltaAdd = "DiffAdd",
@@ -45,11 +42,7 @@ local LINKS = {
 	DravenPanelUnread = "DiagnosticHint",
 	DravenPanelIgnored = "NonText",
 	DravenPanelActive = "CursorLine",
-	DravenPanelStatus = "Comment",
 	DravenPanelHint = "NonText",
-
-	-- Scratch buffers standing in for content that is not on disk
-	DravenNotice = "Comment",
 }
 
 function M.setup()

@@ -1,0 +1,473 @@
+*draven.txt*  A code review surface that remembers what you already read
+
+Author:  ploMP4
+License: MIT
+
+==============================================================================
+CONTENTS                                                     *draven-contents*
+
+  1. Introduction ................................. |draven-introduction|
+  2. Requirements ................................. |draven-requirements|
+  3. Setup ........................................ |draven-setup|
+  4. Commands ..................................... |draven-commands|
+  5. Mappings ..................................... |draven-mappings|
+  6. Hunk states .................................. |draven-states|
+  7. Findings ..................................... |draven-findings|
+  8. Export ....................................... |draven-export|
+  9. Configuration ................................ |draven-configuration|
+ 10. Highlights ................................... |draven-highlights|
+ 11. Lua API ...................................... |draven-api|
+ 12. Stored state ................................. |draven-state|
+ 13. Troubleshooting .............................. |draven-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                          *draven-introduction*
+
+draven is a code review surface for changes you did not write — typically an
+agent's. That job differs from reviewing a colleague's pull request in ways
+the tooling has to account for:
+
+  - You are the author of record but not the author. Every line needs reading.
+  - Diffs arrive large, fast, and across many files at once.
+  - Review is iterative. You read, you send findings back, the agent rewrites,
+    you read again. Three or four rounds on one changeset.
+  - The output of your review is usually a prompt, not a comment thread.
+
+The idea draven is built on: review state is content-addressed, not
+file-addressed.
+
+Other tools mark "file viewed" and drop the flag the moment the file changes,
+so round three of a review costs as much as round one. draven marks hunks
+(|draven-states|), keyed to a hash of their content. When the agent rewrites
+one hunk of a file you already read, your marks on the rest survive, and the
+one that changed shows you a diff against the version you approved.
+
+Two constraints shape everything else:
+
+Never claim something is reviewed when it is not.
+	When anchoring is uncertain, the hunk goes stale. A false "unread"
+	costs you seconds; a false "reviewed" costs you the trust that makes
+	the tool worth using.
+
+Do not fight Neovim.
+	The diff window shows your real file buffer with decorations on top,
+	never a copy. |gd|, hover, treesitter, |]c|, search and every mapping
+	you already have keep working.
+
+draven is not a git client. Staging, commits, branch management and conflict
+resolution are deliberately out of scope.
+
+==============================================================================
+2. REQUIREMENTS                                          *draven-requirements*
+
+  - Neovim 0.10 or newer (developed against 0.12)
+  - git
+
+Run |:checkhealth| draven to verify.
+
+==============================================================================
+3. SETUP                                                        *draven-setup*
+
+Install `ploMP4/draven` with your plugin manager of choice.
+
+Calling |draven.setup()| is optional; it only exists to change defaults. See
+|draven-configuration|.
+
+draven sets no global mappings of its own. Everything in |draven-mappings| is
+buffer-local to the review, so a mapping for opening one is left to you: >lua
+
+	vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>")
+<
+
+==============================================================================
+4. COMMANDS                                                  *draven-commands*
+
+                                                                     *:Draven*
+:Draven [{revspec}]
+		Open the review, or focus it if it is already open.
+
+		With no argument, reviews the working tree against HEAD —
+		including untracked files, which is where an agent's new files
+		show up. Otherwise {revspec} may be:
+
+		  {rev}		working tree against {rev}
+		  {a}..{b}	the commits between {a} and {b}
+		  {a}...{b}	everything on {b} since it left {a}
+
+		Examples: >
+			:Draven
+			:Draven main
+			:Draven HEAD~3..HEAD
+			:Draven main...HEAD
+<
+                                                               *:DravenToggle*
+:DravenToggle [{revspec}]
+		Open the review, or close it if it is open.
+
+                                                                *:DravenClose*
+:DravenClose	Close the review and write its state.
+
+                                                               *:DravenExport*
+:DravenExport	Copy findings to a register as a prompt for your agent.
+		See |draven-export|.
+
+                                                             *:DravenFindings*
+:DravenFindings	Load every finding into the |quickfix| list.
+
+                                                               *:DravenStatus*
+:DravenStatus[!] [{revspec}]
+		Report what a changeset contains without opening anything.
+		With [!], print a line per file.
+
+                                                                *:DravenReset*
+:DravenReset[!] [{revspec}]
+		Discard a review's marks, findings and snapshots. Asks first;
+		with [!] it does not. This cannot be undone.
+
+==============================================================================
+5. MAPPINGS                                                  *draven-mappings*
+
+These are buffer-local to the review — both the panel and whichever file the
+diff window is showing — and are removed again when the review closes. Set any
+of them to `false` in your config to skip it (|draven-configuration|).
+
+	<leader>rr	Mark the hunk read, then jump to the next unread one.
+			This is the key you will spend the most time on.
+			In the panel, marks the whole file.
+	<leader>rf	Mark every hunk in the file read.
+	<leader>ru	Unmark the hunk.
+	<leader>ra	Mark everything read.
+
+	<leader>rn	Next hunk that still needs reading, across files.
+	<leader>rp	Previous one.
+	<leader>rs	Next hunk that changed since you read it.
+	]f  [f		Next / previous file.
+
+	<leader>rd	On a stale hunk: what changed since you approved it.
+			See |draven-states|.
+
+	<leader>rc	Write a finding on this line, or edit the one already
+			there. See |draven-findings|.
+	<leader>rt	Toggle the finding under the cursor resolved.
+	<leader>rX	Delete the finding under the cursor.
+	<leader>rl	Load findings into the |quickfix| list.
+	<leader>rx	Copy findings as a prompt for your agent.
+
+	<leader>rz	Toggle the unchanged-code folds.
+	<leader>rR	Rebuild from git, keeping every mark.
+	<leader>re	Jump to the panel.
+	<leader>rq	Close the review and save.
+
+	<CR>		Panel only: open a file, or fold a directory.
+
+Everything else is ordinary Neovim.
+
+==============================================================================
+6. HUNK STATES                                                 *draven-states*
+
+Progress is counted in hunks, not files, so `2/5` next to a file means three
+hunks in it are still unread. A hunk is one of three things:
+
+	✓  reviewed	You have read this, and it has not changed since.
+	○  unread	You have never seen it.
+	↻  stale	You read it, and the agent has rewritten it since.
+
+Unchanged code folds away by default, so a 900-line file with three hunks
+reads as three hunks. |zR| opens everything, as always.
+
+                                                            *draven-re-review*
+The states are decided by content, in order of confidence:
+
+reviewed
+	The hunk's content hash matches a mark. Or its whitespace-normalised
+	hash does, which means the code says the same thing and only its
+	formatting moved — a gofmt run over reviewed code does not un-review
+	it.
+
+stale
+	A mark covers the same lines *of the base revision*, so this hunk is a
+	rewrite of something you approved.
+
+	This leans on the one coordinate system that holds still. New-side
+	line numbers shift every time the agent touches a file, but every hunk
+	in a review is a diff against the same base revision, so its old-side
+	range is a fixed address.
+
+unread
+	Neither. You have never seen this code.
+
+On a stale hunk, `<leader>rd` shows what changed between the version you
+approved and what is on disk now — usually a few lines, rather than the whole
+hunk again. That comparison needs the bytes you approved, which draven stores
+when you mark a hunk (|draven-state|).
+
+                                                           *draven-base-moved*
+When the base revision itself moves — you commit, you rebase — every recorded
+old-side address points somewhere else. draven drops them rather than trusting
+them, tells you how many marks were affected, and falls back to content
+addressing alone. Marks still hold; only the ability to say "this is a rewrite
+of that" is lost.
+
+==============================================================================
+7. FINDINGS                                                  *draven-findings*
+
+`<leader>rc` opens a scratch buffer in a float. It is just text, so your
+insert mappings, abbreviations and undo all work.
+
+	<Tab>		Cycle severity: blocking → question → nit.
+	<C-s>  ZZ  :w	Save.
+	<Esc>  q	Discard.
+
+Saved findings appear at the end of the line they point at, and are counted in
+the panel.
+
+                                                            *draven-anchoring*
+A finding is anchored to a line of code, not a line number — for the same
+reason marks are content-addressed. Re-anchoring after a rewrite tries, in
+order:
+
+	1. The hunk it was written against, if that hunk is unchanged.
+	2. Whatever now covers the same region of the base revision, searched
+	   for the line's text.
+	3. A unique match for that text anywhere else in the file.
+
+When none of those land, the finding is marked orphaned rather than pointed at
+whatever moved into its place. Orphaned findings keep their text and their
+last known line so you can still act on them, and say so in the export.
+
+Severities are for the agent's benefit as much as yours: the export tells it
+to fix the blockers and treat the nits as optional.
+
+==============================================================================
+8. EXPORT                                                      *draven-export*
+
+`<leader>rx` (or |:DravenExport|) writes your findings to a register as
+markdown built to be pasted straight into an agent: grouped by severity, each
+one carrying its file, line and a code excerpt.
+
+Resolved findings stay in the state file but drop out of the prompt. Set
+`export.unresolved_only = false` to include them.
+
+`<leader>rl` (or |:DravenFindings|) loads findings into the |quickfix| list
+instead, typed by severity — blocking as `E`, question as `W`, nit as `I` — so
+|:cnext|, |:cdo| and your existing quickfix mappings work on them.
+
+==============================================================================
+9. CONFIGURATION                                        *draven-configuration*
+
+Defaults shown. Pass any subset to `require("draven").setup()`. >lua
+
+	require("draven").setup({
+	  base = "HEAD",              -- default base for a worktree review
+	  context = 3,                -- lines of context per hunk
+	  include_untracked = true,   -- new files the agent created
+	  max_file_bytes = 1024*1024, -- bigger untracked files: listed only
+	  max_snapshot_bytes = 256*1024,
+	  log_level = vim.log.levels.INFO,
+
+	  git = { bin = "git", timeout_ms = 15000 },
+
+	  ignore = {
+	    enabled = true,
+	    patterns = { "**/*.lock", "**/go.sum", "**/node_modules/**" },
+	  },
+
+	  ui = {
+	    panel = { width = 38, position = "left" },
+	    signs = {
+	      reviewed = "✓", unread = "○", partial = "◐",
+	      stale = "↻", ignored = "⊘", hunk = "╎",
+	    },
+	    delta   = { max_width = 110, max_height = 30, border = "rounded"},
+	    comment = { width = 76, height = 8, border = "rounded" },
+	    fold_unchanged = true,
+	    fold_context = 6,
+	    finding_virt_text = true,
+	  },
+
+	  export = { register = "+", unresolved_only = true },
+	  findings = { default_severity = "blocking" },
+
+	  keymaps = { ... },          -- see |draven-mappings|
+	})
+<
+                                                               *draven-ignore*
+`ignore.patterns` **replaces** the default list rather than extending it.
+Ignored files stay visible in the panel but are excluded from the totals, so a
+regenerated lockfile can never make your progress look worse. Glob syntax:
+
+	`**/`	zero or more directories
+	`**`	anything, including `/`
+	`*`	anything except `/`
+	`?`	one character except `/`
+
+Any entry in `keymaps` may be set to `false` to skip it.
+
+==============================================================================
+10. HIGHLIGHTS                                             *draven-highlights*
+
+Every group links to one your colorscheme already defines, so draven looks
+like the rest of your editor. All links are `default`, so your own
+|:highlight| calls win.
+
+	DravenAdd		DiffAdd
+	DravenDelete		DiffDelete
+
+	DravenSignReviewed	DiagnosticOk
+	DravenSignUnread	DiagnosticHint
+	DravenSignStale		DiagnosticWarn
+	DravenSignBar		Comment
+
+	DravenPanelTitle	Title
+	DravenPanelBase		Comment
+	DravenPanelProgress	Special
+	DravenPanelDir		Directory
+	DravenPanelFile		Normal
+	DravenPanelCount	Comment
+	DravenPanelReviewed	DiagnosticOk
+	DravenPanelPartial	DiagnosticInfo
+	DravenPanelStale	DiagnosticWarn
+	DravenPanelUnread	DiagnosticHint
+	DravenPanelIgnored	NonText
+	DravenPanelActive	CursorLine
+	DravenPanelHint		NonText
+
+	DravenFindingBlocking	DiagnosticError
+	DravenFindingQuestion	DiagnosticWarn
+	DravenFindingNit	DiagnosticHint
+	DravenFindingResolved	NonText
+
+	DravenDeltaAdd		DiffAdd
+	DravenDeltaDelete	DiffDelete
+	DravenDeltaHeader	Title
+	DravenDeltaMeta		Comment
+	DravenDeltaHunk		DiffChange
+
+==============================================================================
+11. LUA API                                                       *draven-api*
+
+                                                              *draven.setup()*
+draven.setup({opts})
+		Change defaults. Optional. See |draven-configuration|.
+
+                                                               *draven.open()*
+draven.open({opts})
+		Open the review. {opts} may carry `rev` and `cwd`.
+
+                                                              *draven.close()*
+                                                             *draven.toggle()*
+                                                            *draven.is_open()*
+draven.close()
+draven.toggle({opts})
+draven.is_open()
+
+                                                          *draven.changeset()*
+draven.changeset({opts}, {callback})
+		Build a changeset. With a {callback} it runs asynchronously;
+		without one it blocks until the result is ready, which is
+		convenient from |:lua| and tests but must not be done from a
+		mapping or autocommand. >lua
+
+			local cs = require("draven").changeset()
+			local cs = require("draven").changeset({
+			  rev = "main...HEAD",
+			})
+
+			require("draven").changeset({}, function(err, cs)
+			  if err then return end
+			  print(require("draven").summary(cs))
+			end)
+<
+		A changeset is plain data: >lua
+
+			{
+			  root     = "/home/you/project",
+			  git_dir  = "/home/you/project/.git",
+			  revspec  = { kind = "worktree", base = "HEAD" },
+			  base_rev = "a1b2c3...",
+			  unborn   = false,
+			  files    = { ... },
+			  stats    = { files = 14, hunks = 62, ... },
+			}
+<
+		Each file carries `path`, `old_path`, `status`, `binary`,
+		`untracked`, `ignored` and its hunks. Each hunk carries its
+		line ranges, its parsed lines with both old and new line
+		numbers, and `content_hash` and `anchor_key`.
+
+                                                            *draven.summary()*
+                                                              *draven.lines()*
+draven.summary({cs})
+draven.lines({cs})
+		A one-line summary, and a line per file.
+
+                                                             *draven.export()*
+                                                           *draven.findings()*
+draven.export()
+draven.findings()
+		Back |:DravenExport| and |:DravenFindings|.
+
+                                                              *draven.reset()*
+draven.reset({opts})
+		Discard stored state. {opts} may carry `rev`, `cwd` and
+		`force`. Destructive.
+
+Iterating every reviewable hunk, ignored files skipped: >lua
+
+	local cs = require("draven").changeset()
+	for file, hunk in require("draven.core.changeset").hunks(cs) do
+	  print(file.path, hunk.index, hunk.content_hash)
+	end
+<
+==============================================================================
+12. STORED STATE                                                *draven-state*
+
+Review state lives under the git directory, one file per review target: >
+
+	.git/draven/worktree@HEAD.json
+	.git/draven/range@main...HEAD.json
+	.git/draven/snapshots/worktree@HEAD/<content-hash>
+<
+The JSON holds your marks (keyed by content hash) and your findings. It is
+plain and greppable on purpose: when something goes wrong it can be read and
+repaired by hand, or thrown away with |:DravenReset|.
+
+Snapshots are the post-image of every hunk you approve, which is what makes
+the v1→v2 delta possible. They are content-addressed, so identical hunks share
+one file, and orphans are pruned when a review closes. Hunks larger than
+`max_snapshot_bytes` are still tracked but get no snapshot; their delta view
+will say so.
+
+Nothing is written outside the git directory, and nothing is committed.
+
+==============================================================================
+13. TROUBLESHOOTING                                   *draven-troubleshooting*
+
+Everything went unread after I committed.
+	Not quite — see |draven-base-moved|. Marks whose content still matches
+	are kept; what is lost is the ability to recognise a rewrite. This is
+	expected: old-side line numbers mean nothing against a new base.
+
+A hunk I definitely read came back as stale.
+	Something in it changed. `<leader>rd` shows exactly what. If the delta
+	looks like pure whitespace, the reformat was large enough that the
+	normalised hash could not match either — mark it read again.
+
+My finding says "orphaned".
+	The line it pointed at no longer exists anywhere in the file's diff.
+	The text is kept, along with where it used to be, so you can still act
+	on it. See |draven-anchoring|.
+
+The panel says a file is ignored.
+	It matched an `ignore.patterns` glob. You can still open it; it just
+	does not count toward progress. See |draven-ignore|.
+
+Opening a review says "no changes to review".
+	The working tree matches the base. Try a |:Draven| {revspec}.
+
+Nothing folds.
+	`ui.fold_unchanged` may be off, or `<leader>rz` toggled it. Note that
+	folding only hides code more than `ui.fold_context` lines from a hunk,
+	so a small file with scattered changes has nothing to fold.
+
+vim:tw=78:ts=8:noet:ft=help:norl:

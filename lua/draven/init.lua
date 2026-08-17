@@ -146,6 +146,63 @@ function M.findings()
 	require("draven.ui").list_findings()
 end
 
+---Throw away a review's marks, findings and snapshots.
+---
+---Destructive and not undoable, so it asks first unless `force` is set.
+---@param opts? { rev?: string, cwd?: string, force?: boolean }
+function M.reset(opts)
+	opts = opts or {}
+	local log = require("draven.util.log")
+
+	M.changeset({ rev = opts.rev, cwd = opts.cwd }, function(err, cs)
+		if err or not cs then
+			log.error(err or "could not resolve the review to reset")
+			return
+		end
+
+		local state = require("draven.state")
+		local path = state.path(cs)
+
+		if vim.fn.filereadable(path) == 0 then
+			log.info("no saved review state for " .. (cs.revspec.arg ~= "" and cs.revspec.arg or "HEAD"))
+			return
+		end
+
+		local session = require("draven.session").new(cs)
+		local reviewed = select(1, session:progress())
+		local findings = #session:findings({ unresolved_only = false })
+
+		local function drop()
+			if M.is_open() then
+				M.close()
+			end
+			state.delete(cs)
+			log.info("review state discarded")
+		end
+
+		if opts.force then
+			return drop()
+		end
+
+		vim.schedule(function()
+			local answer = vim.fn.confirm(
+				("Discard %d mark%s and %d finding%s for %s?"):format(
+					reviewed,
+					reviewed == 1 and "" or "s",
+					findings,
+					findings == 1 and "" or "s",
+					path
+				),
+				"&Discard\n&Cancel",
+				2
+			)
+			if answer == 1 then
+				drop()
+			end
+		end)
+	end)
+end
+
 ---Print a changeset summary without opening anything. Backs `:DravenStatus`.
 ---@param rev? string
 ---@param opts? { verbose?: boolean }

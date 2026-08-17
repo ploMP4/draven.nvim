@@ -42,8 +42,13 @@ vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>", { desc = "[R]eview [O]pen" 
 
 :DravenToggle            " open or close
 :DravenClose             " close and save state
+:DravenExport            " findings to the clipboard, as a prompt for the agent
+:DravenFindings          " findings into the quickfix list
 :DravenStatus!           " a per-file breakdown, without opening anything
+:DravenReset             " throw away this review's marks and findings
 ```
+
+`:help draven` has the rest.
 
 `:Draven` opens a tab: the changeset on the left, the diff on the right. The
 diff is your real file buffer with decorations on top, so `gd`, hover, `]c`,

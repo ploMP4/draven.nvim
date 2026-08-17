@@ -36,6 +36,8 @@ function M.new(cs)
 		base_stable = true,
 		_status = {},
 		_by_path = {},
+		_by_anchor = {},
+		_findings_by_path = {},
 		_save_timer = nil,
 	}, Session)
 
@@ -80,9 +82,30 @@ function Session:_settle_base()
 	end
 end
 
----Group marks by the file they were made in, and classify every hunk.
+---Classify a hunk, taking the two hash lookups directly rather than letting
+---`anchor.classify` scan for them. Same answer, but O(1) for the common case
+---instead of O(marks in this file) — which matters when one file holds
+---hundreds of hunks.
+---@param hunk draven.Hunk
+---@return draven.HunkStatus
+---@return draven.MarkRecord|nil
+function Session:_classify(hunk)
+	local exact = self.state.reviewed[hunk.content_hash]
+	if exact then
+		return "reviewed", exact
+	end
+
+	local reindented = self._by_anchor[hunk.anchor_key]
+	if reindented then
+		return "reviewed", reindented
+	end
+
+	return anchor.classify(hunk, self._by_path[hunk.path], { base_stable = self.base_stable })
+end
+
+---Index marks by file and by anchor, then classify every hunk.
 function Session:_reclassify()
-	self._by_path = {}
+	self._by_path, self._by_anchor = {}, {}
 
 	for hash, record in pairs(self.state.reviewed) do
 		-- Older records were keyed only; make the key reachable from the value.
@@ -94,14 +117,37 @@ function Session:_reclassify()
 			self._by_path[record.path] = list
 		end
 		list[#list + 1] = record
+
+		-- Anchor keys already carry their path, so this cannot collide across
+		-- files.
+		if record.anchor_key then
+			self._by_anchor[record.anchor_key] = record
+		end
 	end
 
 	self._status = {}
 	for _, entry in ipairs(self.order) do
-		local status, origin = anchor.classify(entry.hunk, self._by_path[entry.hunk.path], {
-			base_stable = self.base_stable,
-		})
+		local status, origin = self:_classify(entry.hunk)
 		self._status[entry.hunk.id] = { status = status, origin = origin }
+	end
+end
+
+---Group findings by file. The panel asks for per-file counts once per row, so
+---without this a large changeset scans every finding for every file.
+function Session:_index_findings()
+	self._findings_by_path = {}
+
+	for _, item in pairs(self.state.findings or {}) do
+		local list = self._findings_by_path[item.path]
+		if not list then
+			list = {}
+			self._findings_by_path[item.path] = list
+		end
+		list[#list + 1] = item
+	end
+
+	for _, list in pairs(self._findings_by_path) do
+		table.sort(list, finding_mod.before)
 	end
 end
 
@@ -114,6 +160,8 @@ function Session:_reanchor_findings()
 			base_stable = self.base_stable,
 		})
 	end
+
+	self:_index_findings()
 end
 
 ---Rebuild the ordered hunk list. Call after replacing the changeset.
@@ -152,10 +200,7 @@ function Session:hunk_state(hunk)
 	end
 
 	-- Hunks outside the review order (ignored files) are classified on demand.
-	local status = anchor.classify(hunk, self._by_path[hunk.path], {
-		base_stable = self.base_stable,
-	})
-	return status
+	return (self:_classify(hunk))
 end
 
 ---The mark a stale hunk descends from, if any.
@@ -190,22 +235,29 @@ end
 ---@return draven.Finding[]
 function Session:findings(opts)
 	opts = opts or {}
-	local out = {}
 
-	for _, item in pairs(self.state.findings or {}) do
-		local keep = true
-		if opts.unresolved_only and item.resolved then
-			keep = false
+	local source
+	if opts.path then
+		source = self._findings_by_path[opts.path] or {}
+	else
+		source = {}
+		for _, item in pairs(self.state.findings or {}) do
+			source[#source + 1] = item
 		end
-		if opts.path and item.path ~= opts.path then
-			keep = false
-		end
-		if keep then
+		table.sort(source, finding_mod.before)
+	end
+
+	if not opts.unresolved_only then
+		-- Per-path lists are already sorted; copy so callers cannot mutate.
+		return opts.path and vim.list_slice(source) or source
+	end
+
+	local out = {}
+	for _, item in ipairs(source) do
+		if not item.resolved then
 			out[#out + 1] = item
 		end
 	end
-
-	table.sort(out, finding_mod.before)
 	return out
 end
 
@@ -214,12 +266,11 @@ end
 ---@return draven.Finding[]
 function Session:findings_at(path, lnum)
 	local out = {}
-	for _, item in pairs(self.state.findings or {}) do
-		if item.path == path and item.lnum == lnum then
+	for _, item in ipairs(self._findings_by_path[path] or {}) do
+		if item.lnum == lnum then
 			out[#out + 1] = item
 		end
 	end
-	table.sort(out, finding_mod.before)
 	return out
 end
 
@@ -230,15 +281,13 @@ end
 function Session:finding_counts(path)
 	local total, unresolved, orphaned = 0, 0, 0
 
-	for _, item in pairs(self.state.findings or {}) do
-		if item.path == path then
-			total = total + 1
-			if not item.resolved then
-				unresolved = unresolved + 1
-			end
-			if item.state == "orphaned" then
-				orphaned = orphaned + 1
-			end
+	for _, item in ipairs(self._findings_by_path[path] or {}) do
+		total = total + 1
+		if not item.resolved then
+			unresolved = unresolved + 1
+		end
+		if item.state == "orphaned" then
+			orphaned = orphaned + 1
 		end
 	end
 
@@ -259,6 +308,7 @@ function Session:add_finding(hunk, lnum, opts)
 
 	self.state.findings = self.state.findings or {}
 	self.state.findings[item.id] = item
+	self:_index_findings()
 	self:save_soon()
 
 	return item
@@ -272,6 +322,7 @@ function Session:remove_finding(id)
 	end
 
 	self.state.findings[id] = nil
+	self:_index_findings()
 	self:save_soon()
 	return true
 end
@@ -288,6 +339,7 @@ function Session:update_finding(id, body, severity)
 	item.body = body
 	item.severity = finding_mod.normalize_severity(severity)
 	item.updated_at = os.time()
+	self:_index_findings()
 	self:save_soon()
 end
 
@@ -301,6 +353,7 @@ function Session:toggle_resolved(id)
 
 	item.resolved = not item.resolved
 	item.updated_at = os.time()
+	self:_index_findings()
 	self:save_soon()
 	return item.resolved
 end
