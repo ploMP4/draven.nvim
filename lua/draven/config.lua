@@ -84,6 +84,9 @@ local defaults = {
 		panel = {
 			width = 38,
 			position = "left",
+			-- Uses nvim-web-devicons when it is installed, and reads fine
+			-- without it.
+			icons = true,
 		},
 
 		signs = {

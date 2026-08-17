@@ -6,6 +6,35 @@ local config = require("draven.config")
 
 local M = {}
 
+---nvim-web-devicons if it happens to be installed. Resolved once, and the
+---panel reads the same without it.
+local devicons
+local function icon_for(path)
+	if not config.options.ui.panel.icons then
+		return nil, nil
+	end
+	if devicons == nil then
+		local ok, mod = pcall(require, "nvim-web-devicons")
+		devicons = ok and mod or false
+	end
+	if not devicons then
+		return nil, nil
+	end
+
+	local name = vim.fn.fnamemodify(path, ":t")
+	return devicons.get_icon(name, vim.fn.fnamemodify(name, ":e"), { default = true })
+end
+
+---A bar that reads at a glance, unlike a bare percentage.
+---@param done integer
+---@param total integer
+---@param cells integer
+---@return string
+local function progress_bar(done, total, cells)
+	local filled = total > 0 and math.floor((done / total) * cells + 0.5) or cells
+	return string.rep("▰", filled) .. string.rep("▱", cells - filled)
+end
+
 M.ns = vim.api.nvim_create_namespace("draven.panel")
 
 ---@class draven.PanelEntry
@@ -115,9 +144,14 @@ function Panel:render(session, active_path)
 
 	local reviewed, total, stale = session:progress()
 	local percent = total > 0 and math.floor(reviewed / total * 100) or 100
-	local progress = (" %d/%d hunks · %d%%"):format(reviewed, total, percent)
-	local progress_line = put(progress, { kind = "chrome" })
-	mark(progress_line, 0, #progress, "DravenPanelProgress")
+
+	local bar = progress_bar(reviewed, total, 12)
+	local bar_line = put((" %s %d%%"):format(bar, percent), { kind = "chrome" })
+	mark(bar_line, 1, #bar, "DravenPanelProgress")
+
+	local counts = (" %d of %d hunks read"):format(reviewed, total)
+	local counts_line = put(counts, { kind = "chrome" })
+	mark(counts_line, 0, #counts, "DravenPanelCount")
 
 	local open_findings = #session:findings({ unresolved_only = true })
 	if open_findings > 0 then
@@ -143,9 +177,16 @@ function Panel:render(session, active_path)
 	put(" " .. string.rep("─", math.max(1, width - 2)), { kind = "chrome" })
 
 	-- Files ---------------------------------------------------------------
+	-- Knowing which file ends its directory is what lets the guides close.
+	local last_in_dir = {}
+	for index, file in ipairs(cs.files) do
+		local dir = vim.fn.fnamemodify(file.path, ":h")
+		last_in_dir[dir == "." and "./" or dir .. "/"] = index
+	end
+
 	local current_dir = nil
 
-	for _, file in ipairs(cs.files) do
+	for index, file in ipairs(cs.files) do
 		local dir = vim.fn.fnamemodify(file.path, ":h")
 		if dir == "." then
 			dir = "./"
@@ -186,19 +227,31 @@ function Panel:render(session, active_path)
 			local flag = unresolved > 0 and ("!%d "):format(unresolved) or ""
 			count = flag .. count
 
-			local budget = width - 6 - vim.fn.strdisplaywidth(count) - 1
+			local guide = last_in_dir[dir] == index and " └ " or " │ "
+			local icon, icon_hl = icon_for(file.path)
+			local icon_cell = icon and (icon .. " ") or ""
+
+			local prefix = ("%s%s %s"):format(guide, glyph, icon_cell)
+			local prefix_w = vim.fn.strdisplaywidth(prefix)
+
+			local budget = width - prefix_w - vim.fn.strdisplaywidth(count) - 2
 			name = fit(name, math.max(6, budget))
 
 			local pad = math.max(
 				1,
-				width - 5 - vim.fn.strdisplaywidth(name) - vim.fn.strdisplaywidth(count) - 1
+				width - prefix_w - vim.fn.strdisplaywidth(name) - vim.fn.strdisplaywidth(count) - 1
 			)
-			local text = ("   %s %s%s%s"):format(glyph, name, string.rep(" ", pad), count)
+			local text = ("%s%s%s%s"):format(prefix, name, string.rep(" ", pad), count)
 
 			local lnum = put(text, { kind = "file", file = file })
-			mark(lnum, 3, #glyph, glyph_hl)
+			mark(lnum, 0, #guide, "DravenPanelGuide")
+			mark(lnum, #guide, #glyph, glyph_hl)
 
-			local name_col = 3 + #glyph + 1
+			if icon and icon_hl then
+				mark(lnum, #guide + #glyph + 1, #icon, icon_hl)
+			end
+
+			local name_col = #prefix
 			mark(lnum, name_col, #name, file.ignored and "DravenPanelIgnored" or "DravenPanelFile")
 			local count_col = name_col + #name + pad
 			if #flag > 0 then

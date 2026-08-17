@@ -247,13 +247,26 @@ local function finding_highlight(item)
 	})[item.severity] or "DravenFindingBlocking"
 end
 
----Findings sit above the line they point at, drawn as a box.
+---@param item draven.Finding
+---@return string
+local function finding_underline(item)
+	if item.resolved then
+		return "DravenFindingResolvedLine"
+	end
+	return ({
+		blocking = "DravenFindingBlockingLine",
+		question = "DravenFindingQuestionLine",
+		nit = "DravenFindingNitLine",
+	})[item.severity] or "DravenFindingBlockingLine"
+end
+
+---Findings mark the code, and hang their text off it.
 ---
----End-of-line text is invisible on a long line, which is exactly the kind of
----line worth commenting on. A box above it is always readable, shows a
----multi-line comment in full, and reads as a note *about* the code rather
----than part of it. Collapse one to a single line with the toggle key; a
----resolved finding collapses on its own.
+---The commented line is underlined in the severity's colour — the same way a
+---diagnostic marks code — so you can see at a glance which line carries a
+---note, and the diff's own background survives underneath. The text sits
+---above it behind an accent bar, with no frame drawn around it: a box read as
+---a separate window sitting on the file rather than an annotation of it.
 ---@param bufnr integer
 ---@param file draven.File
 ---@param session draven.Session
@@ -266,64 +279,54 @@ local function render_findings(bufnr, file, session, width)
 
 	local finding_mod = require("draven.finding")
 	local total = line_count(bufnr)
-	local dw = vim.fn.strdisplaywidth
 
 	for _, item in ipairs(session:findings({ path = file.path })) do
 		if item.lnum and item.lnum >= 1 and item.lnum <= total then
 			local hl = finding_highlight(item)
-			local border_hl = item.resolved and "DravenFindingResolved" or hl .. "Border"
-			local label = ("%s %s"):format(item.resolved and "✓" or "▎", item.severity)
-			local body = vim.split(vim.trim(item.body or ""), "\n", { plain = true })
+			local text = vim.api.nvim_buf_get_lines(bufnr, item.lnum - 1, item.lnum, false)[1] or ""
 
-			local virt_lines
+			-- Mark the code itself. Underline layers over the diff background
+			-- instead of replacing it, so an added line stays visibly added.
+			pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
+				end_row = item.lnum - 1,
+				end_col = #text,
+				hl_group = finding_underline(item),
+				priority = 200,
+			})
 
 			if mode == "eol" then
 				pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
-					virt_text = { { ("  %s · %s"):format(label, finding_mod.headline(item)), hl } },
+					virt_text = { { ("  ▌ %s"):format(finding_mod.headline(item)), hl } },
 					virt_text_pos = "eol",
 					priority = 130,
 				})
-				goto continue
-			elseif item.collapsed or item.resolved then
-				local summary = ("  ▸ %s · %s"):format(label, finding_mod.headline(item))
-				virt_lines = { { { summary, border_hl } } }
 			else
-				-- Fit the box to its content, but never past the window.
-				local inner = dw(label) + 6
-				for _, line in ipairs(body) do
-					inner = math.max(inner, dw(line) + 3)
+				local body = vim.split(vim.trim(item.body or ""), "\n", { plain = true })
+				local badge = item.resolved and "✓ " .. item.severity or item.severity
+				local virt_lines = {}
+
+				local function row(label, content)
+					local line = ("  ▌ %s%s"):format(label, content)
+					local pad = math.max(0, width - vim.fn.strdisplaywidth(line))
+					virt_lines[#virt_lines + 1] = { { line .. string.rep(" ", pad), hl } }
 				end
-				inner = math.min(inner, math.max(24, width - 6))
 
-				local fill = math.max(1, inner - 3 - dw(label))
-				virt_lines = {
-					{ { "  ╭─ " .. label .. " " .. string.rep("─", fill) .. "╮", border_hl } },
-				}
-
-				for _, line in ipairs(body) do
-					-- Long lines are cut rather than wrapped: the full text is
-					-- always one <leader>rc away.
-					if dw(line) > inner - 3 then
-						line = vim.fn.strcharpart(line, 0, inner - 4) .. "…"
+				if item.collapsed or item.resolved then
+					local more = #body > 1 and " …" or ""
+					row(badge .. " · ", finding_mod.headline(item) .. more)
+				else
+					local gutter = string.rep(" ", vim.fn.strdisplaywidth(badge) + 2)
+					for i, line in ipairs(body) do
+						row(i == 1 and (badge .. "  ") or gutter, line)
 					end
-					virt_lines[#virt_lines + 1] = {
-						{ "  │ ", border_hl },
-						{ line .. string.rep(" ", math.max(0, inner - 1 - dw(line))), hl },
-						{ "│", border_hl },
-					}
 				end
 
-				virt_lines[#virt_lines + 1] =
-					{ { "  ╰" .. string.rep("─", inner) .. "╯", border_hl } }
+				pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
+					virt_lines = virt_lines,
+					virt_lines_above = true,
+					priority = 130,
+				})
 			end
-
-			pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
-				virt_lines = virt_lines,
-				virt_lines_above = true,
-				priority = 130,
-			})
-
-			::continue::
 		end
 	end
 end

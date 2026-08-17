@@ -28,10 +28,12 @@ local LINKS = {
 	DravenFindingQuestion = "DiagnosticWarn",
 	DravenFindingNit = "DiagnosticHint",
 	DravenFindingResolved = "NonText",
-	-- The box drawn around a finding, dimmer than its text.
-	DravenFindingBlockingBorder = "DiagnosticError",
-	DravenFindingQuestionBorder = "DiagnosticWarn",
-	DravenFindingNitBorder = "DiagnosticHint",
+	-- The mark on the commented line itself. Underlines rather than
+	-- backgrounds, so the diff's own colours survive underneath.
+	DravenFindingBlockingLine = "DiagnosticUnderlineError",
+	DravenFindingQuestionLine = "DiagnosticUnderlineWarn",
+	DravenFindingNitLine = "DiagnosticUnderlineHint",
+	DravenFindingResolvedLine = "DiagnosticUnderlineOk",
 
 	-- Floats. NormalFloat is the right thing to follow; a colorscheme that
 	-- wants transparent floats says so there.
@@ -63,6 +65,7 @@ local LINKS = {
 	DravenPanelIgnored = "NonText",
 	DravenPanelActive = "CursorLine",
 	DravenPanelHint = "NonText",
+	DravenPanelGuide = "Comment",
 }
 
 function M.setup()

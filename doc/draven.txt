@@ -348,14 +348,16 @@ like the rest of your editor. All links are `default`, so your own
 	DravenPanelIgnored	NonText
 	DravenPanelActive	CursorLine
 	DravenPanelHint		NonText
+	DravenPanelGuide	Comment
 
 	DravenFindingBlocking	DiagnosticError
 	DravenFindingQuestion	DiagnosticWarn
 	DravenFindingNit	DiagnosticHint
 	DravenFindingResolved	NonText
-	DravenFindingBlockingBorder	DiagnosticError
-	DravenFindingQuestionBorder	DiagnosticWarn
-	DravenFindingNitBorder	DiagnosticHint
+	DravenFindingBlockingLine	DiagnosticUnderlineError
+	DravenFindingQuestionLine	DiagnosticUnderlineWarn
+	DravenFindingNitLine	DiagnosticUnderlineHint
+	DravenFindingResolvedLine	DiagnosticUnderlineOk
 
 	DravenFloat		NormalFloat
 	DravenFloatBorder	FloatBorder
