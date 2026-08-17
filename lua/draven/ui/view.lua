@@ -148,7 +148,7 @@ end
 local function apply_window_options(win)
 	local ui = config.options.ui
 
-	vim.wo[win].signcolumn = "yes:1"
+	vim.wo[win].signcolumn = "yes:2"
 	vim.wo[win].wrap = false
 
 	vim.wo[win].foldmethod = "expr"

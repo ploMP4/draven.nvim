@@ -217,11 +217,32 @@ local function render_hunk(bufnr, hunk, status, width)
 		last = first
 	end
 
-	-- Review state marks the hunk once, in the sign column. A spine down
-	-- every line of it competed with the +/- markers for attention and told
-	-- you nothing the diff colours do not.
+	-- The sign column: a coloured bar down every line of the hunk so its
+	-- extent and kind read at a glance, with review state in a slot of
+	-- its own.
+	--
+	-- Every line of the hunk gets both signs, blanks included. That is
+	-- deliberate: leaving a gap lets another plugin's signs fill it, and
+	-- two symbologies in one gutter is what made this confusing to read.
+	local kinds = {}
+	for _, line in ipairs(hunk.lines) do
+		if line.new_lnum and line.kind ~= "delete" then
+			kinds[line.new_lnum] = line.kind
+		end
+	end
+
 	local glyph, glyph_hl = status_sign(status)
-	sign(bufnr, first, glyph, glyph_hl)
+
+	for lnum = first, last do
+		if lnum == first then
+			sign(bufnr, lnum, glyph, glyph_hl, 140)
+		else
+			sign(bufnr, lnum, " ", "DravenSignBar", 140)
+		end
+
+		local added = kinds[lnum] == "add"
+		sign(bufnr, lnum, signs.bar, added and "DravenHunkAdd" or "DravenHunkContext", 130)
+	end
 
 	-- Unchanged lines inside the hunk get the same two cells, so the marker
 	-- column is straight rather than staggered.

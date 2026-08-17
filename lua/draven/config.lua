@@ -96,6 +96,8 @@ local defaults = {
 			stale = "↻",
 			ignored = "⊘",
 			hunk = "╎",
+			-- The bar marking a hunk's extent.
+			bar = "▎",
 			-- A second sign column carries these, so added and removed lines
 			-- read as a diff even when a colorscheme's DiffAdd and DiffDelete
 			-- backgrounds look alike.

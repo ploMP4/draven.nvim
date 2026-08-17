@@ -128,8 +128,7 @@ function Panel:render(session, active_path)
 	end
 
 	-- Header ------------------------------------------------------------
-	local title = put(" draven", { kind = "chrome" })
-	mark(title, 1, 6, "DravenPanelTitle")
+	local signs = config.options.ui.signs
 
 	local scope
 	if cs.revspec.kind == "range" then
@@ -139,42 +138,50 @@ function Panel:render(session, active_path)
 	else
 		scope = ("working tree ← %s"):format(cs.revspec.base)
 	end
-	local scope_line = put(" " .. fit(scope, width - 2), { kind = "chrome" })
-	mark(scope_line, 1, #scope + 1, "DravenPanelBase")
+
+	-- Name and scope share a line: the panel is narrow, and two lines of
+	-- chrome before any content is a line too many.
+	local head = (" draven  %s"):format(fit(scope, math.max(4, width - 10)))
+	local head_line = put(head, { kind = "chrome" })
+	mark(head_line, 1, 6, "DravenPanelTitle")
+	mark(head_line, 9, #head - 9, "DravenPanelBase")
 
 	local reviewed, total, stale = session:progress()
 	local percent = total > 0 and math.floor(reviewed / total * 100) or 100
 
 	local bar = progress_bar(reviewed, total, 12)
-	local bar_line = put((" %s %d%%"):format(bar, percent), { kind = "chrome" })
+	local tally = ("%d/%d"):format(reviewed, total)
+	local gap = math.max(1, width - 2 - vim.fn.strdisplaywidth(bar) - #tally - 5)
+	local bar_line = put(
+		(" %s%s%s %3d%%"):format(bar, string.rep(" ", gap), tally, percent),
+		{ kind = "chrome" }
+	)
 	mark(bar_line, 1, #bar, "DravenPanelProgress")
+	mark(bar_line, 1 + #bar + gap, #tally, "DravenPanelCount")
 
-	local counts = (" %d of %d hunks read"):format(reviewed, total)
-	local counts_line = put(counts, { kind = "chrome" })
-	mark(counts_line, 0, #counts, "DravenPanelCount")
-
-	local open_findings = #session:findings({ unresolved_only = true })
-	if open_findings > 0 then
-		local text = (" ! %d finding%s to send back"):format(
-			open_findings,
-			open_findings == 1 and "" or "s"
-		)
-		local lnum = put(text, { kind = "chrome" })
-		mark(lnum, 0, #text, "DravenFindingBlocking")
+	-- Badges for the two things that want acting on, side by side.
+	local badges, badge_marks = " ", {}
+	if #session:findings({ unresolved_only = true }) > 0 then
+		local n = #session:findings({ unresolved_only = true })
+		badge_marks[#badge_marks + 1] = { col = #badges, len = 0, group = "DravenFindingBlocking" }
+		local text = ("! %d finding%s"):format(n, n == 1 and "" or "s")
+		badge_marks[#badge_marks].len = #text
+		badges = badges .. text .. "   "
 	end
-
 	if stale > 0 then
-		-- Rewritten-since-you-read-it is the thing worth surfacing at the top.
-		local text = (" %s %d changed since you read %s"):format(
-			config.options.ui.signs.stale,
-			stale,
-			stale == 1 and "it" or "them"
-		)
-		local lnum = put(text, { kind = "chrome" })
-		mark(lnum, 0, #text, "DravenPanelStale")
+		local text = ("%s %d changed"):format(signs.stale, stale)
+		badge_marks[#badge_marks + 1] = { col = #badges, len = #text, group = "DravenPanelStale" }
+		badges = badges .. text
+	end
+	if #badge_marks > 0 then
+		local lnum = put(badges:gsub("%s+$", ""), { kind = "chrome" })
+		for _, b in ipairs(badge_marks) do
+			mark(lnum, b.col, b.len, b.group)
+		end
 	end
 
-	put(" " .. string.rep("─", math.max(1, width - 2)), { kind = "chrome" })
+	local rule = put(" " .. string.rep("─", math.max(1, width - 2)), { kind = "chrome" })
+	mark(rule, 1, width - 2, "DravenPanelRule")
 
 	-- Files ---------------------------------------------------------------
 	-- Knowing which file ends its directory is what lets the guides close.

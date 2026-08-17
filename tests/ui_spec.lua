@@ -176,6 +176,16 @@ describe("panel", function()
 		return vim.api.nvim_buf_get_lines(panel.bufnr, 0, -1, false)
 	end
 
+	---The header line carrying the progress bar, whatever row it lands on.
+	local function progress_line()
+		for _, line in ipairs(lines()) do
+			if line:find("▰") or line:find("▱") then
+				return line
+			end
+		end
+		return ""
+	end
+
 	it("groups files under their directory", function()
 		panel:render(session, nil)
 		local text = table.concat(lines(), "\n")
@@ -189,14 +199,14 @@ describe("panel", function()
 	it("counts progress in hunks", function()
 		panel:render(session, nil)
 		local _, total = session:progress()
-		local text = table.concat(lines(), "\n")
 
-		assert.is_truthy(text:match(("0 of %d hunks read"):format(total)))
-		assert.is_truthy(text:match("0%%"))
+		assert.is_truthy(progress_line():match(("0/%d"):format(total)))
+		assert.is_truthy(progress_line():match("0%%"))
 
 		session:mark_all(true)
 		panel:render(session, nil)
-		assert.is_truthy(table.concat(lines(), "\n"):match("100%%"))
+		assert.is_truthy(progress_line():match(("%d/%d"):format(total, total)))
+		assert.is_truthy(progress_line():match("100%%"))
 	end)
 
 	it("maps lines back to files", function()
@@ -313,19 +323,21 @@ describe("review surface", function()
 		local panel_buf, _, view_win = windows()
 
 		local function progress()
-			return table.concat(vim.api.nvim_buf_get_lines(panel_buf, 0, -1, false), "\n")
+			for _, line in ipairs(vim.api.nvim_buf_get_lines(panel_buf, 0, -1, false)) do
+				if line:find("▰") or line:find("▱") then
+					return line
+				end
+			end
+			return ""
 		end
 
-		assert.is_truthy(progress():match("0 of %d+ hunks read"))
+		assert.is_truthy(progress():match("0/%d+"))
 
 		vim.api.nvim_set_current_win(view_win)
 		ui.mark_hunk(true)
 		vim.wait(300)
 
-		assert.is_truthy(
-			progress():match("1 of %d+ hunks read"),
-			"expected one hunk marked, got: " .. progress()
-		)
+		assert.is_truthy(progress():match("1/%d+"), "expected one hunk marked, got: " .. progress())
 	end)
 
 	it("marks a whole file from the panel", function()
@@ -339,8 +351,8 @@ describe("review surface", function()
 		ui.mark_all(true)
 		vim.wait(300)
 
-		local progress = vim.api.nvim_buf_get_lines(panel_buf, 0, -1, false)[3]
-		assert.is_truthy(progress:match("100%%"), "got: " .. progress)
+		local text = table.concat(vim.api.nvim_buf_get_lines(panel_buf, 0, -1, false), "\n")
+		assert.is_truthy(text:match("100%%"), "got: " .. text)
 	end)
 
 	it("closes cleanly and leaves no decorations behind", function()
@@ -413,7 +425,7 @@ describe("review surface", function()
 		local panel_buf = windows()
 		local text = table.concat(vim.api.nvim_buf_get_lines(panel_buf, 0, -1, false), "\n")
 
-		assert.is_truthy(text:match("1 of %d+ hunks read"), "the mark should have survived: " .. text)
+		assert.is_truthy(text:match("1/%d+"), "the mark should have survived: " .. text)
 	end)
 
 	it("reports that there is nothing to review on a clean tree", function()

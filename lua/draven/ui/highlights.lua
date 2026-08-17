@@ -15,6 +15,8 @@ local LINKS = {
 	DravenSignUnread = "DiagnosticHint",
 	DravenSignStale = "DiagnosticWarn",
 	DravenSignBar = "Comment",
+	DravenHunkAdd = "DiffAdd",
+	DravenHunkContext = "Comment",
 	DravenSignAdd = "DiffAdd",
 	DravenSignDelete = "DiffDelete",
 
@@ -66,6 +68,7 @@ local LINKS = {
 	DravenPanelActive = "CursorLine",
 	DravenPanelHint = "NonText",
 	DravenPanelGuide = "Comment",
+	DravenPanelRule = "NonText",
 }
 
 function M.setup()
