@@ -12,8 +12,9 @@ draven marks **hunks** reviewed, keyed to a hash of their content. When the
 agent rewrites one hunk of a file you already read, the marks on the other
 hunks survive and only the changed one goes stale.
 
-> The model is built and tested; there is no UI yet. `:Draven` reports what
-> it found so the model can be exercised against real repos.
+> The review surface works — panel, diff decoration, hunk navigation,
+> progress and persistence. Stale detection, the v1→v2 delta view and
+> findings are still to come.
 
 ## Requirements
 
@@ -25,6 +26,12 @@ hunks survive and only the changed one goes stale.
 Install `ploMP4/draven` with your plugin manager of choice. Calling
 `require("draven").setup()` is optional — it only exists to change defaults.
 
+draven sets no global mappings, so bind opening a review yourself:
+
+```lua
+vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>", { desc = "[R]eview [O]pen" })
+```
+
 ## Usage
 
 ```vim
@@ -32,8 +39,37 @@ Install `ploMP4/draven` with your plugin manager of choice. Calling
 :Draven main             " working tree vs main
 :Draven HEAD~3..HEAD     " a commit range
 :Draven main...HEAD      " everything since the branch point
-:Draven!                 " same, with a per-file breakdown
+
+:DravenToggle            " open or close
+:DravenClose             " close and save state
+:DravenStatus!           " a per-file breakdown, without opening anything
 ```
+
+`:Draven` opens a tab: the changeset on the left, the diff on the right. The
+diff is your real file buffer with decorations on top, so `gd`, hover, `]c`,
+search and every mapping you already have keep working.
+
+### Keys
+
+Buffer-local to the review:
+
+| Key | Does |
+| --- | --- |
+| `<leader>rr` | mark the hunk read, then jump to the next unread one |
+| `<leader>rf` | mark the whole file read |
+| `<leader>ru` | unmark the hunk |
+| `<leader>ra` | mark everything read |
+| `<leader>rn` / `<leader>rp` | next / previous unread hunk, across files |
+| `]f` / `[f` | next / previous file |
+| `<leader>rz` | toggle the unchanged-code folds |
+| `<leader>rR` | rebuild from git, keeping every mark |
+| `<leader>re` | jump to the panel |
+| `<leader>rq` | close and save |
+| `<CR>` | panel only: open a file, or fold a directory |
+
+Progress is counted in hunks, not files: `2/5` on a file means three hunks in
+it are still unread. Unchanged code folds away by default, so a 900-line file
+with three hunks reads as three hunks.
 
 ## API
 
@@ -100,8 +136,23 @@ require("draven").setup({
     enabled = true,
     patterns = { "**/*.lock", "**/go.sum", "**/node_modules/**", ... },
   },
+
+  ui = {
+    panel = { width = 38, position = "left" },
+    signs = { reviewed = "✓", unread = "○", partial = "◐", ignored = "⊘", hunk = "╎" },
+    fold_unchanged = true,
+    fold_context = 6,
+  },
+
+  keymaps = {              -- set any entry to false to skip it
+    mark_hunk = "<leader>rr",
+    -- ...see the table above
+  },
 })
 ```
+
+Review state lives in `<gitdir>/draven/<revspec>.json` — plain JSON, one file
+per review target, keyed by content hash.
 
 Ignored files stay visible in the changeset but are excluded from the totals,
 so a regenerated lockfile can never make review progress look worse.
@@ -124,6 +175,8 @@ uncertain the hunk goes stale. A false "unread" costs ten seconds; a false
 lua/draven/
 ├── init.lua              public API
 ├── config.lua            defaults and merge
+├── session.lua           a changeset joined to its marks
+├── state.lua             JSON persistence, keyed by content hash
 ├── health.lua            :checkhealth draven
 ├── core/                 pure model — no UI, no editor state
 │   ├── git.lua           async vim.system plumbing
@@ -131,8 +184,17 @@ lua/draven/
 │   ├── hunk.lua          hunk model + content addressing
 │   ├── changeset.lua     the assembled review target
 │   └── ignore.lua        generated-file rules
+├── ui/
+│   ├── init.lua          the review tab: layout, keymaps, actions
+│   ├── panel.lua         the changeset tree
+│   ├── view.lua          the diff window and its buffers
+│   ├── render.lua        extmark decoration and folds
+│   └── highlights.lua    groups, linked to your colorscheme
 └── util/                 async runtime, fs, glob, log
 ```
+
+Opening a 257-file, 607-hunk changeset takes ~140 ms; marking a hunk with a
+full panel repaint takes ~10 ms.
 
 ## Development
 

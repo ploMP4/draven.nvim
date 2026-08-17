@@ -42,6 +42,7 @@ local M = {}
 
 ---@class draven.Changeset
 ---@field root string
+---@field git_dir string
 ---@field revspec draven.RevSpec
 ---@field base_rev string|nil # resolved sha, nil for a commit range
 ---@field unborn boolean # HEAD has no commits yet
@@ -274,6 +275,7 @@ function M.build(opts)
 
 	return {
 		root = root,
+		git_dir = git.git_dir(root),
 		revspec = spec,
 		base_rev = base_rev,
 		unborn = unborn,

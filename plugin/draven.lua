@@ -33,10 +33,30 @@ local function complete_rev(arglead)
 end
 
 vim.api.nvim_create_user_command("Draven", function(cmd)
-	require("draven").review(cmd.args, { verbose = cmd.bang })
+	require("draven").open({ rev = cmd.args })
+end, {
+	nargs = "?",
+	complete = complete_rev,
+	desc = "Review a changeset (no argument: working tree vs HEAD)",
+})
+
+vim.api.nvim_create_user_command("DravenClose", function()
+	require("draven").close()
+end, { desc = "Close the review and save its state" })
+
+vim.api.nvim_create_user_command("DravenToggle", function(cmd)
+	require("draven").toggle({ rev = cmd.args })
+end, {
+	nargs = "?",
+	complete = complete_rev,
+	desc = "Toggle the review surface",
+})
+
+vim.api.nvim_create_user_command("DravenStatus", function(cmd)
+	require("draven").status(cmd.args, { verbose = cmd.bang })
 end, {
 	nargs = "?",
 	bang = true,
 	complete = complete_rev,
-	desc = "Review a changeset (no argument: working tree vs HEAD)",
+	desc = "Report a changeset without opening it (! for a per-file breakdown)",
 })

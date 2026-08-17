@@ -9,6 +9,23 @@ local M = {}
 ---@field enabled boolean
 ---@field patterns string[] # globs, see `draven.util.glob`
 
+---@class draven.PanelConfig
+---@field width integer
+---@field position "left"|"right"
+
+---@class draven.SignsConfig
+---@field reviewed string
+---@field unread string
+---@field partial string
+---@field ignored string
+---@field hunk string
+
+---@class draven.UiConfig
+---@field panel draven.PanelConfig
+---@field signs draven.SignsConfig
+---@field fold_unchanged boolean
+---@field fold_context integer
+
 ---@class draven.Config
 ---@field base string # default base revision for a working-tree review
 ---@field context integer # lines of context per hunk
@@ -17,6 +34,8 @@ local M = {}
 ---@field log_level integer
 ---@field git draven.GitConfig
 ---@field ignore draven.IgnoreConfig
+---@field ui draven.UiConfig
+---@field keymaps table<string, string|false>
 local defaults = {
 	base = "HEAD",
 	context = 3,
@@ -57,6 +76,44 @@ local defaults = {
 			"**/build/**",
 		},
 	},
+
+	ui = {
+		panel = {
+			width = 38,
+			position = "left",
+		},
+
+		signs = {
+			reviewed = "✓",
+			unread = "○",
+			partial = "◐",
+			ignored = "⊘",
+			hunk = "╎",
+		},
+
+		-- Unchanged code folds away so a 900-line file with three hunks reads
+		-- as three hunks. `zR` opens everything, as always.
+		fold_unchanged = true,
+		fold_context = 6,
+	},
+
+	-- Buffer-local to the review tab. Set any entry to `false` to skip it.
+	-- A global mapping for opening a review is left to you; see the README.
+	keymaps = {
+		mark_hunk = "<leader>rr",
+		mark_file = "<leader>rf",
+		unmark_hunk = "<leader>ru",
+		mark_all = "<leader>ra",
+		next_hunk = "<leader>rn",
+		prev_hunk = "<leader>rp",
+		next_file = "]f",
+		prev_file = "[f",
+		toggle_fold = "<leader>rz",
+		refresh = "<leader>rR",
+		focus_panel = "<leader>re",
+		quit = "<leader>rq",
+		open_entry = "<CR>",
+	},
 }
 
 ---@type draven.Config
@@ -80,6 +137,13 @@ function M.setup(opts)
 	-- leave stale defaults behind. Replace them wholesale instead.
 	if opts.ignore and opts.ignore.patterns then
 		merged.ignore.patterns = vim.deepcopy(opts.ignore.patterns)
+	end
+
+	-- `false` disables a keymap, but `tbl_deep_extend` drops false values.
+	if opts.keymaps then
+		for action, lhs in pairs(opts.keymaps) do
+			merged.keymaps[action] = lhs
+		end
 	end
 
 	M.options = merged

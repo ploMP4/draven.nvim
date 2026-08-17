@@ -1,13 +1,9 @@
 ---draven — a code review surface for Neovim that remembers what you read.
----
----This is the model only: git plumbing, diff parsing, the hunk/changeset
----types and their content addressing. There is no UI yet; `:Draven` reports
----what it found so the model can be exercised against real repositories.
 local async = require("draven.util.async")
 
 local M = {}
 
-M.version = "0.1.0"
+M.version = "0.2.0"
 
 ---@param opts? table
 function M.setup(opts)
@@ -120,10 +116,30 @@ function M.lines(cs)
 	return out
 end
 
----Backing implementation of `:Draven`.
+---Open the review surface, or focus it if it is already open.
+---@param opts? { rev?: string, cwd?: string }
+function M.open(opts)
+	require("draven.ui").open(opts)
+end
+
+function M.close()
+	require("draven.ui").close()
+end
+
+---@param opts? { rev?: string, cwd?: string }
+function M.toggle(opts)
+	require("draven.ui").toggle(opts)
+end
+
+---@return boolean
+function M.is_open()
+	return require("draven.ui").is_open()
+end
+
+---Print a changeset summary without opening anything. Backs `:DravenStatus`.
 ---@param rev? string
 ---@param opts? { verbose?: boolean }
-function M.review(rev, opts)
+function M.status(rev, opts)
 	opts = opts or {}
 	local log = require("draven.util.log")
 
@@ -133,7 +149,7 @@ function M.review(rev, opts)
 			return
 		end
 
-		if cs.stats.files == 0 and #cs.files == 0 then
+		if #cs.files == 0 then
 			log.info("no changes to review")
 			return
 		end
@@ -143,7 +159,6 @@ function M.review(rev, opts)
 			return
 		end
 
-		-- `:Draven!` prints the breakdown without opening the panel.
 		local report = { "draven — " .. M.summary(cs) }
 		vim.list_extend(report, M.lines(cs))
 		vim.schedule(function()

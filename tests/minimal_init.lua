@@ -33,6 +33,9 @@ vim.opt.rtp = { vim.env.VIMRUNTIME }
 vim.opt.rtp:append(plenary)
 vim.opt.rtp:append(root)
 
+-- So specs can `require("helpers")`.
+package.path = root .. "/tests/?.lua;" .. package.path
+
 vim.opt.swapfile = false
 vim.env.GIT_CONFIG_GLOBAL = "/dev/null"
 vim.env.GIT_CONFIG_SYSTEM = "/dev/null"
