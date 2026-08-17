@@ -69,15 +69,17 @@ function M.open(opts)
 		col = math.max(0, math.floor((vim.o.columns - width) / 2)),
 		style = "minimal",
 		border = ui.border,
-		title = " " .. opts.title .. " ",
-		title_pos = "center",
+		title = { { "  ✎ " .. opts.title .. "  ", "DravenCommentTitle" } },
+		title_pos = "left",
 	})
 
 	vim.wo[open_win].wrap = true
 	vim.wo[open_win].linebreak = true
 	vim.wo[open_win].number = false
 	vim.wo[open_win].relativenumber = false
-	vim.wo[open_win].signcolumn = "no"
+	-- A sign column nobody puts signs in is the cheapest left padding there
+	-- is, and text pressed against a border reads badly.
+	vim.wo[open_win].signcolumn = "yes:1"
 	vim.wo[open_win].winblend = config.options.ui.winblend
 	vim.wo[open_win].winhighlight = table.concat({
 		"Normal:DravenFloat",
@@ -88,6 +90,25 @@ function M.open(opts)
 		"EndOfBuffer:DravenFloat",
 	}, ",")
 	set_footer(open_win, severity, editing)
+
+	-- Placeholder, so an empty composer says what it wants.
+	local ns = vim.api.nvim_create_namespace("draven.comment")
+	local function refresh_placeholder()
+		vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+		if #lines <= 1 and vim.trim(lines[1] or "") == "" then
+			pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, 0, 0, {
+				virt_text = { { "What is wrong with this line?", "DravenCommentHint" } },
+				virt_text_pos = "overlay",
+			})
+		end
+	end
+	refresh_placeholder()
+
+	vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+		buffer = bufnr,
+		callback = refresh_placeholder,
+	})
 
 	local submitted = false
 

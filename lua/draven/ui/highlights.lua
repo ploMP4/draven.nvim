@@ -33,11 +33,14 @@ local LINKS = {
 	DravenFindingQuestionBorder = "DiagnosticWarn",
 	DravenFindingNitBorder = "DiagnosticHint",
 
-	-- Floats
+	-- Floats. NormalFloat is the right thing to follow; a colorscheme that
+	-- wants transparent floats says so there.
 	DravenFloat = "NormalFloat",
 	DravenFloatBorder = "FloatBorder",
 	DravenFloatTitle = "FloatTitle",
 	DravenFloatFooter = "FloatFooter",
+	DravenCommentTitle = "FloatTitle",
+	DravenCommentHint = "NonText",
 
 	-- The v1→v2 delta
 	DravenDeltaAdd = "DiffAdd",

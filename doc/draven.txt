@@ -361,6 +361,8 @@ like the rest of your editor. All links are `default`, so your own
 	DravenFloatBorder	FloatBorder
 	DravenFloatTitle	FloatTitle
 	DravenFloatFooter	FloatFooter
+	DravenCommentTitle	FloatTitle
+	DravenCommentHint	NonText
 
 	DravenDeltaAdd		DiffAdd
 	DravenDeltaDelete	DiffDelete
