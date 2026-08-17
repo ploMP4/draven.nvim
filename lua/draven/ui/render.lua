@@ -217,12 +217,11 @@ local function render_hunk(bufnr, hunk, status, width)
 		last = first
 	end
 
+	-- Review state marks the hunk once, in the sign column. A spine down
+	-- every line of it competed with the +/- markers for attention and told
+	-- you nothing the diff colours do not.
 	local glyph, glyph_hl = status_sign(status)
 	sign(bufnr, first, glyph, glyph_hl)
-
-	for lnum = first + 1, last do
-		sign(bufnr, lnum, signs.hunk, "DravenSignBar")
-	end
 
 	-- Unchanged lines inside the hunk get the same two cells, so the marker
 	-- column is straight rather than staggered.
