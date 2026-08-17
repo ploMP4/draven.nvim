@@ -56,27 +56,69 @@ function M.pre_image(lines)
 	return out
 end
 
----Collapse a line to its meaning: indent becomes a depth count, trailing
----whitespace disappears. Blank lines return nil and drop out of the key.
----
----Depth counts tabs as one level and every two spaces as one, which is stable
----for any file that indents consistently — the only case that matters, since a
----hunk's lines all come from the same file.
----@param line string
----@return string|nil
-local function normalize(line)
-	local indent, rest = line:match("^([ \t]*)(.-)%s*$")
-	if rest == "" then
-		return nil
+---Tabs are compared against spaces at this width. It only has to be consistent,
+---not correct: the indent unit is derived per hunk, so the choice cancels out.
+local TAB_WIDTH = 4
+
+---@param indent string
+---@return integer
+local function indent_width(indent)
+	local width = 0
+	for i = 1, #indent do
+		width = width + (indent:sub(i, i) == "\t" and TAB_WIDTH or 1)
 	end
-
-	local tabs = select(2, indent:gsub("\t", ""))
-	local spaces = select(2, indent:gsub(" ", ""))
-
-	return (tabs + math.floor(spaces / 2)) .. "\1" .. rest
+	return width
 end
 
-M.normalize_line = normalize
+---@return integer
+local function gcd(a, b)
+	while b ~= 0 do
+		a, b = b, a % b
+	end
+	return a
+end
+
+---Collapse lines to their meaning: trailing whitespace disappears, blank lines
+---drop out, and leading indent becomes a *nesting level* rather than a width.
+---
+---The level is the indent width divided by the hunk's own indent unit — the
+---GCD of the widths it actually uses. That is what makes the key survive
+---reformatting: the same block indented with tabs, two spaces or four spaces
+---all reduce to the same 0/1/2 ladder, while genuinely different nesting still
+---reads as different.
+---
+---The trade-off: deriving the unit from the hunk means *relative* structure is
+---preserved but absolute depth is not, so a two-line block at one level and
+---the same block at two levels look identical. Anything with real structure
+---to it disambiguates, and the fallback for a miss is `stale` — a delta you
+---glance at — rather than a wrong `reviewed`.
+---@param lines string[]
+---@return string[]
+function M.normalize(lines)
+	local parsed, unit = {}, 0
+
+	for _, line in ipairs(lines) do
+		local indent, rest = line:match("^([ \t]*)(.-)%s*$")
+		if rest ~= "" then
+			local width = indent_width(indent)
+			parsed[#parsed + 1] = { width = width, rest = rest }
+			if width > 0 then
+				unit = gcd(unit, width)
+			end
+		end
+	end
+
+	if unit == 0 then
+		unit = 1
+	end
+
+	local out = {}
+	for i, entry in ipairs(parsed) do
+		out[i] = math.floor(entry.width / unit) .. "\1" .. entry.rest
+	end
+
+	return out
+end
 
 ---@param path string
 ---@param body string
@@ -100,14 +142,7 @@ function M.build(path, raw, index)
 	end
 
 	local post = M.post_image(raw.lines)
-
-	local normalized = {}
-	for _, l in ipairs(post) do
-		local n = normalize(l)
-		if n then
-			normalized[#normalized + 1] = n
-		end
-	end
+	local normalized = M.normalize(post)
 
 	return {
 		id = ("%s#%d"):format(path, index),

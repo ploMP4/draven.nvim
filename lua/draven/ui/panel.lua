@@ -48,7 +48,7 @@ function M.new()
 	return setmetatable({ bufnr = bufnr, entries = {}, collapsed = {} }, Panel)
 end
 
----@param status "reviewed"|"partial"|"unread"|"ignored"|"empty"
+---@param status "reviewed"|"partial"|"stale"|"unread"|"ignored"|"empty"
 ---@return string glyph
 ---@return string highlight
 local function status_mark(status)
@@ -56,6 +56,8 @@ local function status_mark(status)
 
 	if status == "reviewed" then
 		return signs.reviewed, "DravenPanelReviewed"
+	elseif status == "stale" then
+		return signs.stale, "DravenPanelStale"
 	elseif status == "partial" then
 		return signs.partial, "DravenPanelPartial"
 	elseif status == "ignored" then
@@ -111,11 +113,22 @@ function Panel:render(session, active_path)
 	local scope_line = put(" " .. fit(scope, width - 2), { kind = "chrome" })
 	mark(scope_line, 1, #scope + 1, "DravenPanelBase")
 
-	local reviewed, total = session:progress()
+	local reviewed, total, stale = session:progress()
 	local percent = total > 0 and math.floor(reviewed / total * 100) or 100
 	local progress = (" %d/%d hunks · %d%%"):format(reviewed, total, percent)
 	local progress_line = put(progress, { kind = "chrome" })
 	mark(progress_line, 0, #progress, "DravenPanelProgress")
+
+	if stale > 0 then
+		-- Rewritten-since-you-read-it is the thing worth surfacing at the top.
+		local text = (" %s %d changed since you read %s"):format(
+			config.options.ui.signs.stale,
+			stale,
+			stale == 1 and "it" or "them"
+		)
+		local lnum = put(text, { kind = "chrome" })
+		mark(lnum, 0, #text, "DravenPanelStale")
+	end
 
 	put(" " .. string.rep("─", math.max(1, width - 2)), { kind = "chrome" })
 

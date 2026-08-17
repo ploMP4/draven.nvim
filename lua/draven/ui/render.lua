@@ -94,11 +94,28 @@ local function sign(bufnr, lnum, text, group)
 	})
 end
 
+---@param status draven.HunkStatus
+---@return string glyph
+---@return string highlight
+local function status_sign(status)
+	local signs = config.options.ui.signs
+
+	if status == "reviewed" then
+		return signs.reviewed, "DravenSignReviewed"
+	elseif status == "stale" then
+		return signs.stale, "DravenSignStale"
+	end
+
+	return signs.unread, "DravenSignUnread"
+end
+
+M.status_sign = status_sign
+
 ---@param bufnr integer
 ---@param hunk draven.Hunk
----@param reviewed boolean
+---@param status draven.HunkStatus
 ---@param width integer
-local function render_hunk(bufnr, hunk, reviewed, width)
+local function render_hunk(bufnr, hunk, status, width)
 	local signs = config.options.ui.signs
 
 	-- Added lines, in runs.
@@ -160,12 +177,8 @@ local function render_hunk(bufnr, hunk, reviewed, width)
 		last = first
 	end
 
-	sign(
-		bufnr,
-		first,
-		reviewed and signs.reviewed or signs.unread,
-		reviewed and "DravenSignReviewed" or "DravenSignUnread"
-	)
+	local glyph, glyph_hl = status_sign(status)
+	sign(bufnr, first, glyph, glyph_hl)
 
 	for lnum = first + 1, last do
 		sign(bufnr, lnum, signs.hunk, "DravenSignBar")
@@ -237,16 +250,12 @@ function M.render(bufnr, file, session, opts)
 		local total = line_count(bufnr)
 		highlight_range(bufnr, 1, total, "DravenDelete")
 
-		local reviewed = #file.hunks > 0 and session:is_reviewed(file.hunks[1]) or false
-		local signs = config.options.ui.signs
-		sign(
-			bufnr,
-			1,
-			reviewed and signs.reviewed or signs.unread,
-			reviewed and "DravenSignReviewed" or "DravenSignUnread"
-		)
+		local status = #file.hunks > 0 and session:hunk_state(file.hunks[1]) or "unread"
+		local glyph, glyph_hl = status_sign(status)
+
+		sign(bufnr, 1, glyph, glyph_hl)
 		for lnum = 2, total do
-			sign(bufnr, lnum, signs.hunk, "DravenSignBar")
+			sign(bufnr, lnum, config.options.ui.signs.hunk, "DravenSignBar")
 		end
 
 		fold_levels[bufnr] = nil
@@ -254,7 +263,7 @@ function M.render(bufnr, file, session, opts)
 	end
 
 	for _, hunk in ipairs(file.hunks) do
-		render_hunk(bufnr, hunk, session:is_reviewed(hunk), width)
+		render_hunk(bufnr, hunk, session:hunk_state(hunk), width)
 	end
 
 	-- Always computed, even when folding is off: the window's `foldenable` is

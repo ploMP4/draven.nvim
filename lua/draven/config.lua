@@ -41,6 +41,9 @@ local defaults = {
 	context = 3,
 	include_untracked = true,
 	max_file_bytes = 1024 * 1024,
+	-- Approved hunks larger than this are still tracked, but without a stored
+	-- post-image there is nothing to show a v1→v2 delta against.
+	max_snapshot_bytes = 256 * 1024,
 	log_level = vim.log.levels.INFO,
 
 	git = {
@@ -87,8 +90,15 @@ local defaults = {
 			reviewed = "✓",
 			unread = "○",
 			partial = "◐",
+			stale = "↻",
 			ignored = "⊘",
 			hunk = "╎",
+		},
+
+		delta = {
+			max_width = 110,
+			max_height = 30,
+			border = "rounded",
 		},
 
 		-- Unchanged code folds away so a 900-line file with three hunks reads
@@ -106,6 +116,8 @@ local defaults = {
 		mark_all = "<leader>ra",
 		next_hunk = "<leader>rn",
 		prev_hunk = "<leader>rp",
+		delta = "<leader>rd",
+		next_stale = "<leader>rs",
 		next_file = "]f",
 		prev_file = "[f",
 		toggle_fold = "<leader>rz",

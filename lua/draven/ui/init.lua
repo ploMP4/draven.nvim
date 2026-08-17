@@ -271,6 +271,45 @@ function M.mark_all(reviewed)
 	log.info(("%d/%d hunks marked"):format(done, total))
 end
 
+---Show the delta between the approved version and what is there now.
+function M.show_delta()
+	if not active then
+		return
+	end
+
+	local hunk = active.view:hunk_at_cursor()
+	if not hunk then
+		log.info("no hunk here")
+		return
+	end
+
+	require("draven.ui.delta").open(active.session, hunk)
+end
+
+---Jump to the next hunk the agent rewrote under you.
+---@param backwards? boolean
+function M.goto_next_stale(backwards)
+	if not active then
+		return
+	end
+
+	local from
+	if active.view.file and vim.api.nvim_get_current_win() == active.view_win then
+		local hunk = active.view:hunk_at_cursor()
+		if hunk then
+			from = active.session:position_of(hunk)
+		end
+	end
+
+	local entry = active.session:next_stale(from, backwards)
+	if not entry then
+		log.info("nothing has changed since you read it")
+		return
+	end
+
+	goto_entry(entry)
+end
+
 ---@param backwards? boolean
 function M.goto_file(backwards)
 	if not active then
@@ -391,6 +430,8 @@ end
 ---off your buffers, scratch buffers deleted.
 ---@param review draven.Review
 local function teardown(review)
+	require("draven.ui.delta").close()
+
 	review.session:close()
 	review.view:close()
 
@@ -587,6 +628,16 @@ actions = {
 		desc = "[R]eview [P]revious unread hunk",
 		fn = function()
 			M.goto_next_unread(true)
+		end,
+	},
+	delta = {
+		desc = "[R]eview [D]elta — what changed since you read it",
+		fn = M.show_delta,
+	},
+	next_stale = {
+		desc = "[R]eview next [S]tale hunk",
+		fn = function()
+			M.goto_next_stale(false)
 		end,
 	},
 	next_file = {

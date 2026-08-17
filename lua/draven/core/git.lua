@@ -96,6 +96,20 @@ function M.resolve(rev, cwd)
 	return sha ~= "" and sha or nil
 end
 
+---The commit two revisions diverged from, or nil if they are unrelated.
+---@param a string
+---@param b string
+---@param cwd? string
+---@return string|nil
+function M.merge_base(a, b, cwd)
+	local out = M.exec({ "merge-base", a, b }, { cwd = cwd, check = false })
+	if out.code ~= 0 then
+		return nil
+	end
+	local sha = vim.trim(out.stdout)
+	return sha ~= "" and sha or nil
+end
+
 ---@param revargs string[] # e.g. { "HEAD" } or { "main...HEAD" }
 ---@param cwd string
 ---@return string # raw unified diff

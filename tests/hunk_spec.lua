@@ -54,21 +54,41 @@ describe("hunk images", function()
 	end)
 end)
 
-describe("hunk.normalize_line", function()
+describe("hunk.normalize", function()
 	it("drops blank and whitespace-only lines", function()
-		assert.is_nil(hunk.normalize_line(""))
-		assert.is_nil(hunk.normalize_line("   \t "))
+		assert.same({}, hunk.normalize({ "", "   \t " }))
 	end)
 
 	it("strips trailing whitespace", function()
-		assert.equals(hunk.normalize_line("foo"), hunk.normalize_line("foo   "))
+		assert.same(hunk.normalize({ "foo" }), hunk.normalize({ "foo   " }))
 	end)
 
-	it("collapses indent to a depth count", function()
-		-- One tab and two spaces are both depth 1.
-		assert.equals(hunk.normalize_line("\tfoo"), hunk.normalize_line("  foo"))
-		-- Depth still distinguishes nesting levels.
-		assert.are_not.equals(hunk.normalize_line("  foo"), hunk.normalize_line("    foo"))
+	it("reduces any indent style to the same nesting ladder", function()
+		local block = { "func f() {", "\tif x {", "\t\treturn 1", "\t}", "}" }
+
+		local two_space = { "func f() {", "  if x {", "    return 1", "  }", "}" }
+		local four_space = { "func f() {", "    if x {", "        return 1", "    }", "}" }
+
+		assert.same(hunk.normalize(block), hunk.normalize(two_space))
+		assert.same(hunk.normalize(block), hunk.normalize(four_space))
+	end)
+
+	it("tells different nesting structure apart", function()
+		assert.are_not.same(
+			hunk.normalize({ "a", "\tb", "\tc" }),
+			hunk.normalize({ "a", "\tb", "\t\tc" })
+		)
+	end)
+
+	it("preserves relative nesting, not absolute depth", function()
+		-- Documented limitation: with the unit derived from the hunk itself,
+		-- a block indented one level and the same block indented two are
+		-- indistinguishable. Deeper structure is what carries the signal.
+		assert.same(hunk.normalize({ "a", "\tb" }), hunk.normalize({ "a", "\t\tb" }))
+	end)
+
+	it("handles a block with no indentation at all", function()
+		assert.same({ "0\1a", "0\1b" }, hunk.normalize({ "a", "b" }))
 	end)
 end)
 

@@ -242,8 +242,10 @@ describe("changeset.build", function()
 		assert.equals("range", cs.revspec.kind)
 		assert.equals(1, #cs.files)
 		assert.equals(2, cs.stats.added)
-		-- A range never reaches the working tree, so no untracked files.
-		assert.is_nil(cs.base_rev)
+		-- The base resolves for ranges too: hunk old-side addresses are
+		-- measured against it, and stale detection needs to know when it moves.
+		assert.is_string(cs.base_rev)
+		assert.equals(40, #cs.base_rev)
 	end)
 
 	it("rejects a revision that does not exist", function()

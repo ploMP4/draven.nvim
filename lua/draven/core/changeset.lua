@@ -249,6 +249,12 @@ function M.build(opts)
 		end
 
 		diff_arg = unborn and git.EMPTY_TREE or spec.base
+	else
+		-- Ranges need a resolved base too: it is the coordinate system the
+		-- old side of every hunk is measured against, and stale detection
+		-- is only meaningful while it holds still.
+		base_rev = spec.symmetric and git.merge_base(spec.base, spec.head, root)
+			or git.resolve(spec.base, root)
 	end
 
 	local files = {}

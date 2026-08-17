@@ -12,9 +12,9 @@ draven marks **hunks** reviewed, keyed to a hash of their content. When the
 agent rewrites one hunk of a file you already read, the marks on the other
 hunks survive and only the changed one goes stale.
 
-> The review surface works — panel, diff decoration, hunk navigation,
-> progress and persistence. Stale detection, the v1→v2 delta view and
-> findings are still to come.
+> The thesis works end to end: mark hunks read, let the agent rewrite one,
+> and only that hunk goes stale — with a delta showing what changed against
+> the version you approved. Findings are still to come.
 
 ## Requirements
 
@@ -60,6 +60,8 @@ Buffer-local to the review:
 | `<leader>ru` | unmark the hunk |
 | `<leader>ra` | mark everything read |
 | `<leader>rn` / `<leader>rp` | next / previous unread hunk, across files |
+| `<leader>rd` | on a stale hunk: what changed since you approved it |
+| `<leader>rs` | jump to the next hunk the agent rewrote under you |
 | `]f` / `[f` | next / previous file |
 | `<leader>rz` | toggle the unchanged-code folds |
 | `<leader>rR` | rebuild from git, keeping every mark |
@@ -70,6 +72,39 @@ Buffer-local to the review:
 Progress is counted in hunks, not files: `2/5` on a file means three hunks in
 it are still unread. Unchanged code folds away by default, so a 900-line file
 with three hunks reads as three hunks.
+
+### The re-review loop
+
+This is the part nothing else does. Read a file, send findings to the agent,
+let it rewrite — then reopen or hit `<leader>rR`:
+
+```
+ draven                                  ↻ marks a hunk that changed
+ working tree ← HEAD                       since you read it
+ 1/2 hunks · 50%
+ ↻ 1 changed since you read it
+ ─────────────────────────────
+ ▾ auth/
+   ↻ middleware.go            1/2
+```
+
+The hunk you didn't touch stays `✓`. On the one that did change, `<leader>rd`
+shows the delta rather than the whole hunk:
+
+```
+ ↻  auth/middleware.go · hunk 1
+ approved 14 minutes ago · +2/-1 since
+
+ @@ -2,7 +2,8 @@
+   	 tok := r.Header.Get("Authorization")
+   	 if tok == "" {
+ -		 return ErrEmpty
+ +		 log.Warn("empty token")
+ +		 return ErrEmpty.WithContext(r)
+   	 }
+```
+
+So round three of a review costs you three lines instead of a file.
 
 ## API
 
@@ -108,7 +143,21 @@ with both old and new line numbers, and the two keys review state hangs off:
 | Key | Normalisation | Used for |
 | --- | --- | --- |
 | `content_hash` | none — exact post-image | equal means definitely unchanged |
-| `anchor_key` | indent collapsed to a depth count, trailing whitespace and blank lines dropped | relocating a hunk that moved or got reindented |
+| `anchor_key` | indent reduced to a nesting level, trailing whitespace and blank lines dropped | surviving a reformat |
+
+A hunk is then one of three things, decided in order of confidence:
+
+| | |
+| --- | --- |
+| `reviewed` | its `content_hash` matches a mark — or its `anchor_key` does, meaning only whitespace moved |
+| `stale` | a mark covers the same lines *of the base revision*, so this is a rewrite of something you approved |
+| `unread` | neither: you have never seen this code |
+
+Step two leans on the one coordinate system that holds still. New-side line
+numbers shift every time the agent touches a file, but every hunk in a review
+is a diff against the **same base revision**, so its old-side range is a fixed
+address. When the base itself moves — you commit, you rebase — that reasoning
+is void, and draven drops the recorded addresses rather than guessing.
 
 Iterate every reviewable hunk, ignored files skipped:
 
@@ -182,6 +231,7 @@ lua/draven/
 │   ├── git.lua           async vim.system plumbing
 │   ├── diff.lua          unified diff parser
 │   ├── hunk.lua          hunk model + content addressing
+│   ├── anchor.lua        reviewed / stale / unread, and why
 │   ├── changeset.lua     the assembled review target
 │   └── ignore.lua        generated-file rules
 ├── ui/
@@ -189,6 +239,7 @@ lua/draven/
 │   ├── panel.lua         the changeset tree
 │   ├── view.lua          the diff window and its buffers
 │   ├── render.lua        extmark decoration and folds
+│   ├── delta.lua         the v1→v2 float
 │   └── highlights.lua    groups, linked to your colorscheme
 └── util/                 async runtime, fs, glob, log
 ```

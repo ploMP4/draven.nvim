@@ -15,7 +15,15 @@ local LINKS = {
 	-- Sign column
 	DravenSignReviewed = "DiagnosticOk",
 	DravenSignUnread = "DiagnosticHint",
+	DravenSignStale = "DiagnosticWarn",
 	DravenSignBar = "Comment",
+
+	-- The v1→v2 delta
+	DravenDeltaAdd = "DiffAdd",
+	DravenDeltaDelete = "DiffDelete",
+	DravenDeltaHeader = "Title",
+	DravenDeltaMeta = "Comment",
+	DravenDeltaHunk = "DiffChange",
 
 	-- Panel
 	DravenPanelTitle = "Title",
@@ -25,7 +33,8 @@ local LINKS = {
 	DravenPanelFile = "Normal",
 	DravenPanelCount = "Comment",
 	DravenPanelReviewed = "DiagnosticOk",
-	DravenPanelPartial = "DiagnosticWarn",
+	DravenPanelPartial = "DiagnosticInfo",
+	DravenPanelStale = "DiagnosticWarn",
 	DravenPanelUnread = "DiagnosticHint",
 	DravenPanelIgnored = "NonText",
 	DravenPanelActive = "CursorLine",

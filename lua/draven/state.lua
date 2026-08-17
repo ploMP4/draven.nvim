@@ -14,7 +14,12 @@ M.VERSION = 1
 
 ---@class draven.MarkRecord
 ---@field at integer # unix time the mark was made
----@field path string # for humans reading the file; never used for lookup
+---@field path string # also the lookup key for same-file matching
+---@field content_hash string # the key this record is stored under
+---@field anchor_key string|nil # whitespace-normalised, for re-anchoring
+---@field old_start integer|nil # base-side address, stable while base_rev is
+---@field old_count integer|nil
+---@field snapshot boolean|nil # whether the approved post-image was stored
 
 ---@class draven.State
 ---@field version integer
@@ -127,6 +132,80 @@ function M.save(state, path)
 	end
 
 	return true
+end
+
+--- Snapshots ----------------------------------------------------------------
+---
+---The post-image of every hunk you approve, so that when the agent rewrites it
+---there is something to diff the new version against. Content-addressed, so
+---identical hunks share one file and re-approving costs nothing.
+
+---Scoped per review target. Sharing one directory across revspecs would let
+---pruning one review delete snapshots another still refers to.
+---@param cs draven.Changeset
+---@return string
+function M.snapshot_dir(cs)
+	return ("%s/snapshots/%s"):format(M.dir(cs), M.key(cs))
+end
+
+---@param cs draven.Changeset
+---@param content_hash string
+---@return string
+function M.snapshot_path(cs, content_hash)
+	return ("%s/%s"):format(M.snapshot_dir(cs), content_hash)
+end
+
+---@param cs draven.Changeset
+---@param content_hash string
+---@param lines string[]
+---@return boolean stored
+function M.write_snapshot(cs, content_hash, lines)
+	local path = M.snapshot_path(cs, content_hash)
+	if vim.fn.filereadable(path) == 1 then
+		return true -- content-addressed: already exactly this
+	end
+
+	local dir = M.snapshot_dir(cs)
+	if vim.fn.isdirectory(dir) == 0 then
+		vim.fn.mkdir(dir, "p")
+	end
+
+	return pcall(vim.fn.writefile, lines, path)
+end
+
+---@param cs draven.Changeset
+---@param content_hash string
+---@return string[]|nil
+function M.read_snapshot(cs, content_hash)
+	local path = M.snapshot_path(cs, content_hash)
+	if vim.fn.filereadable(path) == 0 then
+		return nil
+	end
+
+	local ok, lines = pcall(vim.fn.readfile, path)
+	return ok and lines or nil
+end
+
+---Delete snapshots no mark refers to any more.
+---@param cs draven.Changeset
+---@param state draven.State
+---@return integer removed
+function M.prune_snapshots(cs, state)
+	local dir = M.snapshot_dir(cs)
+	if vim.fn.isdirectory(dir) == 0 then
+		return 0
+	end
+
+	local removed = 0
+	for _, path in ipairs(vim.fn.glob(dir .. "/*", true, true)) do
+		local hash = vim.fn.fnamemodify(path, ":t")
+		if not state.reviewed[hash] then
+			vim.fn.delete(path)
+			removed = removed + 1
+		end
+	end
+
+	return removed
 end
 
 ---Forget a changeset's state entirely.
