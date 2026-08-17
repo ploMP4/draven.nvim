@@ -93,6 +93,11 @@ local defaults = {
 			stale = "↻",
 			ignored = "⊘",
 			hunk = "╎",
+			-- A second sign column carries these, so added and removed lines
+			-- read as a diff even when a colorscheme's DiffAdd and DiffDelete
+			-- backgrounds look alike.
+			add = "+",
+			delete = "-",
 		},
 
 		delta = {
@@ -107,8 +112,12 @@ local defaults = {
 			border = "rounded",
 		},
 
-		-- Findings appear at the end of the line they point at.
-		finding_virt_text = true,
+		-- 0 is opaque. Floats inherit your NormalFloat either way.
+		winblend = 0,
+
+		-- "above" keeps a finding readable no matter how long the line is;
+		-- "eol" is the compact original.
+		finding_display = "above",
 
 		-- Unchanged code folds away so a 900-line file with three hunks reads
 		-- as three hunks. `zR` opens everything, as always.
@@ -149,8 +158,15 @@ local defaults = {
 		toggle_fold = "<leader>rz",
 		refresh = "<leader>rR",
 		focus_panel = "<leader>re",
+		toggle_panel = "<leader>rw",
 		quit = "<leader>rq",
 		open_entry = "<CR>",
+		-- Panel only: fold the changeset tree when it is taking up room.
+		collapse_dir = "h",
+		expand_dir = "l",
+		toggle_dir = "za",
+		collapse_all = "zM",
+		expand_all = "zR",
 	},
 }
 

@@ -77,8 +77,11 @@ Buffer-local to the review:
 | `<leader>rz` | toggle the unchanged-code folds |
 | `<leader>rR` | rebuild from git, keeping every mark |
 | `<leader>re` | jump to the panel |
+| `<leader>rw` | hide the panel, or bring it back |
 | `<leader>rq` | close and save |
 | `<CR>` | panel only: open a file, or fold a directory |
+| `h` / `l` | panel only: collapse / expand the directory |
+| `zM` / `zR` | panel only: collapse / expand every directory |
 
 Progress is counted in hunks, not files: `2/5` on a file means three hunks in
 it are still unread. Unchanged code folds away by default, so a 900-line file
@@ -121,8 +124,11 @@ So round three of a review costs you three lines instead of a file.
 
 `<leader>rc` opens a scratch buffer in a float — it is just text, so your
 insert mappings, abbreviations and undo all work. `<Tab>` cycles severity,
-`<C-s>` (or `:w`) saves, `<Esc>` throws it away. Findings show up at the end
-of the line they point at.
+`<C-s>` (or `:w`) saves, `<Esc>` throws it away.
+
+Findings render above the line they point at, so a long line cannot hide
+them and a multi-line comment shows in full. `ui.finding_display = "eol"`
+puts them back at the end of the line.
 
 They are anchored to a *line of code*, not a line number. When the agent
 rewrites the file, a finding follows the line it was written about; when that

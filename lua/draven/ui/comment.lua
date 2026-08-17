@@ -75,6 +75,18 @@ function M.open(opts)
 
 	vim.wo[open_win].wrap = true
 	vim.wo[open_win].linebreak = true
+	vim.wo[open_win].number = false
+	vim.wo[open_win].relativenumber = false
+	vim.wo[open_win].signcolumn = "no"
+	vim.wo[open_win].winblend = config.options.ui.winblend
+	vim.wo[open_win].winhighlight = table.concat({
+		"Normal:DravenFloat",
+		"NormalFloat:DravenFloat",
+		"FloatBorder:DravenFloatBorder",
+		"FloatTitle:DravenFloatTitle",
+		"FloatFooter:DravenFloatFooter",
+		"EndOfBuffer:DravenFloat",
+	}, ",")
 	set_footer(open_win, severity, editing)
 
 	local submitted = false

@@ -113,6 +113,20 @@ local function float(lines, marks, title)
 
 	vim.wo[open_win].wrap = false
 	vim.wo[open_win].cursorline = false
+	vim.wo[open_win].number = false
+	vim.wo[open_win].relativenumber = false
+	vim.wo[open_win].signcolumn = "no"
+	vim.wo[open_win].winblend = config.options.ui.winblend
+	-- Route the float through our own groups so it picks up the colorscheme
+	-- (and its transparency) rather than whatever the last window used.
+	vim.wo[open_win].winhighlight = table.concat({
+		"Normal:DravenFloat",
+		"NormalFloat:DravenFloat",
+		"FloatBorder:DravenFloatBorder",
+		"FloatTitle:DravenFloatTitle",
+		"FloatFooter:DravenFloatFooter",
+		"EndOfBuffer:DravenFloat",
+	}, ",")
 
 	for _, lhs in ipairs({ "q", "<Esc>" }) do
 		vim.keymap.set("n", lhs, M.close, { buffer = bufnr, nowait = true, silent = true })
@@ -160,21 +174,28 @@ function M.open(session, hunk)
 
 	local lines, marks = {}, {}
 	local function put(text, group)
-		lines[#lines + 1] = text
+		lines[#lines + 1] = " " .. text
 		if group then
 			marks[#marks + 1] = { lnum = #lines, group = group }
 		end
 	end
 
 	put(
-		(" %s  %s · hunk %d"):format(config.options.ui.signs.stale, hunk.path, hunk.index),
+		("%s  %s · hunk %d"):format(config.options.ui.signs.stale, hunk.path, hunk.index),
 		"DravenDeltaHeader"
 	)
 	put(
-		(" approved %s · +%d/-%d since"):format(ago(os.time() - (origin.at or os.time())), added, removed),
+		("approved %s · +%d/-%d since"):format(ago(os.time() - (origin.at or os.time())), added, removed),
 		"DravenDeltaMeta"
 	)
-	put("", nil)
+
+	-- A rule the width of the widest line, so the header reads as a header.
+	local rule = 0
+	for _, line in ipairs(body) do
+		rule = math.max(rule, vim.fn.strdisplaywidth(line))
+	end
+	rule = math.max(32, math.min(config.options.ui.delta.max_width - 3, rule))
+	put(string.rep("─", rule), "DravenDeltaMeta")
 
 	for _, line in ipairs(body) do
 		local marker = line:sub(1, 1)
@@ -187,6 +208,16 @@ function M.open(session, hunk)
 		else
 			put(line, nil)
 		end
+	end
+
+	-- Pad every row to the widest, so `line_hl_group` fills instead of
+	-- stopping mid-line and looking unfinished.
+	local widest = 0
+	for _, line in ipairs(lines) do
+		widest = math.max(widest, vim.fn.strdisplaywidth(line))
+	end
+	for i, line in ipairs(lines) do
+		lines[i] = line .. string.rep(" ", widest - vim.fn.strdisplaywidth(line) + 1)
 	end
 
 	float(lines, marks, "v1 → v2")

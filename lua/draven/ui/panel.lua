@@ -247,6 +247,17 @@ function Panel:entry_at(lnum)
 	return self.entries[lnum]
 end
 
+---@param dir string
+---@return integer|nil
+function Panel:line_of_dir(dir)
+	for lnum, entry in pairs(self.entries) do
+		if entry.kind == "dir" and entry.dir == dir then
+			return lnum
+		end
+	end
+	return nil
+end
+
 ---@param path string
 ---@return integer|nil
 function Panel:line_of(path)
@@ -259,8 +270,46 @@ function Panel:line_of(path)
 end
 
 ---@param dir string
-function Panel:toggle_dir(dir)
-	self.collapsed[dir] = not self.collapsed[dir] or nil
+---@param collapsed? boolean # omit to toggle
+function Panel:toggle_dir(dir, collapsed)
+	if collapsed == nil then
+		collapsed = not self.collapsed[dir]
+	end
+	self.collapsed[dir] = collapsed or nil
+end
+
+---Collapse or expand every directory at once.
+---@param session draven.Session
+---@param collapsed boolean
+function Panel:set_all(session, collapsed)
+	self.collapsed = {}
+	if not collapsed then
+		return
+	end
+
+	for _, file in ipairs(session.changeset.files) do
+		local dir = vim.fn.fnamemodify(file.path, ":h")
+		self.collapsed[dir == "." and "./" or dir .. "/"] = true
+	end
+end
+
+---The directory a panel line belongs to, whether it is the header or a file
+---underneath it.
+---@param lnum integer
+---@return string|nil
+function Panel:dir_at(lnum)
+	local entry = self.entries[lnum]
+	if not entry then
+		return nil
+	end
+	if entry.kind == "dir" then
+		return entry.dir
+	end
+	if entry.kind == "file" then
+		local dir = vim.fn.fnamemodify(entry.file.path, ":h")
+		return dir == "." and "./" or dir .. "/"
+	end
+	return nil
 end
 
 M.Panel = Panel

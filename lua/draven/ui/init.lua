@@ -24,6 +24,9 @@ local M = {}
 ---@type draven.Review|nil
 local active = nil
 
+---Defined below; forward-declared so the actions above can reach it.
+local apply_panel_window_options
+
 --- Keymaps -------------------------------------------------------------------
 
 ---@class draven.Action
@@ -35,7 +38,14 @@ local actions = {}
 
 ---Actions that only make sense in the panel. `<CR>` in particular must never
 ---be mapped into a real file buffer.
-local PANEL_ONLY = { open_entry = true }
+local PANEL_ONLY = {
+	open_entry = true,
+	collapse_dir = true,
+	expand_dir = true,
+	toggle_dir = true,
+	collapse_all = true,
+	expand_all = true,
+}
 
 ---@param bufnr integer
 ---@param opts? { panel?: boolean }
@@ -517,6 +527,72 @@ function M.focus_panel()
 	end
 end
 
+---Collapse or expand the directory under the cursor. Panel only.
+---@param collapsed boolean|nil # nil toggles
+function M.fold_dir(collapsed)
+	if not active or vim.api.nvim_get_current_win() ~= active.panel_win then
+		return
+	end
+
+	local lnum = vim.api.nvim_win_get_cursor(active.panel_win)[1]
+	local dir = active.panel:dir_at(lnum)
+	if not dir then
+		return
+	end
+
+	-- Expanding an already-open directory should not be a no-op keypress, so
+	-- `l` on an open one opens the file instead.
+	if collapsed == false and not active.panel.collapsed[dir] then
+		return M.open_entry()
+	end
+
+	active.panel:toggle_dir(dir, collapsed)
+	repaint_panel()
+
+	local target = active.panel:line_of_dir(dir) or lnum
+	pcall(vim.api.nvim_win_set_cursor, active.panel_win, { target, 0 })
+end
+
+---@param collapsed boolean
+function M.fold_all(collapsed)
+	if not active then
+		return
+	end
+
+	active.panel:set_all(active.session, collapsed)
+	repaint_panel()
+	sync_panel_cursor()
+end
+
+---Hide the panel, or bring it back. The changeset tree is worth the width
+---while you are picking what to read, and not while you are reading.
+function M.toggle_panel()
+	if not active then
+		return
+	end
+
+	if vim.api.nvim_win_is_valid(active.panel_win) then
+		active.panel_width = vim.api.nvim_win_get_width(active.panel_win)
+		vim.api.nvim_win_close(active.panel_win, true)
+		active.panel_win = -1
+		focus_view()
+		return
+	end
+
+	local ui = config.options.ui
+	vim.api.nvim_set_current_win(active.view_win)
+	vim.cmd(ui.panel.position == "right" and "botright vsplit" or "topleft vsplit")
+
+	active.panel_win = vim.api.nvim_get_current_win()
+	vim.api.nvim_win_set_buf(active.panel_win, active.panel.bufnr)
+	vim.api.nvim_win_set_width(active.panel_win, active.panel_width or ui.panel.width)
+	apply_panel_window_options(active.panel_win)
+
+	repaint_panel()
+	sync_panel_cursor()
+	focus_view()
+end
+
 ---Rebuild the changeset from git, keeping every mark.
 ---@param opts? { silent?: boolean }
 function M.refresh(opts)
@@ -609,6 +685,19 @@ function M.close()
 	end
 end
 
+---@param win integer
+function apply_panel_window_options(win)
+	vim.wo[win].winfixwidth = true
+	vim.wo[win].number = false
+	vim.wo[win].relativenumber = false
+	vim.wo[win].signcolumn = "no"
+	vim.wo[win].cursorline = true
+	vim.wo[win].wrap = false
+	vim.wo[win].foldenable = false
+	vim.wo[win].list = false
+	vim.wo[win].spell = false
+end
+
 ---@param session draven.Session
 ---@return draven.Review
 local function build_layout(session)
@@ -628,16 +717,7 @@ local function build_layout(session)
 
 	vim.api.nvim_win_set_buf(panel_win, panel.bufnr)
 	vim.api.nvim_win_set_width(panel_win, ui.panel.width)
-
-	vim.wo[panel_win].winfixwidth = true
-	vim.wo[panel_win].number = false
-	vim.wo[panel_win].relativenumber = false
-	vim.wo[panel_win].signcolumn = "no"
-	vim.wo[panel_win].cursorline = true
-	vim.wo[panel_win].wrap = false
-	vim.wo[panel_win].foldenable = false
-	vim.wo[panel_win].list = false
-	vim.wo[panel_win].spell = false
+	apply_panel_window_options(panel_win)
 
 	return {
 		tabpage = tabpage,
@@ -828,6 +908,40 @@ actions = {
 	focus_panel = {
 		desc = "[R]eview focus panel",
 		fn = M.focus_panel,
+	},
+	toggle_panel = {
+		desc = "[R]eview toggle the changeset panel",
+		fn = M.toggle_panel,
+	},
+	collapse_dir = {
+		desc = "Draven: collapse this directory",
+		fn = function()
+			M.fold_dir(true)
+		end,
+	},
+	expand_dir = {
+		desc = "Draven: expand this directory",
+		fn = function()
+			M.fold_dir(false)
+		end,
+	},
+	toggle_dir = {
+		desc = "Draven: fold this directory",
+		fn = function()
+			M.fold_dir(nil)
+		end,
+	},
+	collapse_all = {
+		desc = "Draven: collapse every directory",
+		fn = function()
+			M.fold_all(true)
+		end,
+	},
+	expand_all = {
+		desc = "Draven: expand every directory",
+		fn = function()
+			M.fold_all(false)
+		end,
 	},
 	quit = {
 		desc = "[R]eview [Q]uit",

@@ -50,8 +50,12 @@ local function highlight_range(bufnr, first, last, group)
 	})
 end
 
----Render deleted lines as virtual lines, padded so their background runs the
----full width instead of stopping at the text.
+---Render deleted lines as virtual lines.
+---
+---They open with a gutter that mirrors the real sign column — a spine and a
+---`-` — so a removed line is recognisable as one at a glance, not just by a
+---background colour that many colorschemes make nearly identical to DiffAdd.
+---The text is padded so the background runs the full width.
 ---@param bufnr integer
 ---@param lnum integer # anchor line, 1-based
 ---@param above boolean
@@ -62,13 +66,22 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 		return
 	end
 
+	local signs = config.options.ui.signs
 	local total = line_count(bufnr)
 	lnum = math.max(1, math.min(lnum, total))
 
+	local gutter = ("%-2s"):format(signs.hunk)
+	local marker = ("%-2s"):format(signs.delete)
+	local indent = vim.fn.strdisplaywidth(gutter .. marker)
+
 	local virt_lines = {}
 	for i, text in ipairs(texts) do
-		local pad = math.max(0, width - vim.fn.strdisplaywidth(text))
-		virt_lines[i] = { { text .. string.rep(" ", pad), "DravenDelete" } }
+		local pad = math.max(0, width - indent - vim.fn.strdisplaywidth(text))
+		virt_lines[i] = {
+			{ gutter, "DravenSignBar" },
+			{ marker, "DravenSignDelete" },
+			{ text .. string.rep(" ", pad), "DravenDelete" },
+		}
 	end
 
 	pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, lnum - 1, 0, {
@@ -78,11 +91,14 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 	})
 end
 
+---Place a sign. Higher priority sits further left, so review state stays in
+---the first slot and the +/- marker in the second.
 ---@param bufnr integer
 ---@param lnum integer
 ---@param text string
 ---@param group string
-local function sign(bufnr, lnum, text, group)
+---@param priority? integer
+local function sign(bufnr, lnum, text, group, priority)
 	if lnum < 1 or lnum > line_count(bufnr) then
 		return
 	end
@@ -90,7 +106,7 @@ local function sign(bufnr, lnum, text, group)
 	pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, lnum - 1, 0, {
 		sign_text = text,
 		sign_hl_group = group,
-		priority = 120,
+		priority = priority or 120,
 	})
 end
 
@@ -127,6 +143,11 @@ local function render_hunk(bufnr, hunk, status, width)
 	local function flush_adds()
 		if add_first then
 			highlight_range(bufnr, add_first, add_last, "DravenAdd")
+			-- A `+` in the second sign slot, so an added line reads as added
+			-- without relying on the background alone.
+			for lnum = add_first, add_last do
+				sign(bufnr, lnum, signs.add, "DravenSignAdd", 110)
+			end
 			add_first, add_last = nil, nil
 		end
 	end
@@ -198,31 +219,54 @@ local function finding_highlight(item)
 	})[item.severity] or "DravenFindingBlocking"
 end
 
----Findings sit at the end of the line they point at, so the code stays put.
+---Findings sit above the line they point at by default.
+---
+---End-of-line text is invisible on a long line, which is exactly the kind of
+---line worth commenting on. Above the line it is always readable, and a
+---multi-line finding shows in full instead of being truncated.
 ---@param bufnr integer
 ---@param file draven.File
 ---@param session draven.Session
-local function render_findings(bufnr, file, session)
-	if not config.options.ui.finding_virt_text then
+---@param width integer
+local function render_findings(bufnr, file, session, width)
+	local mode = config.options.ui.finding_display
+	if mode == false or mode == "none" then
 		return
 	end
 
-	local finding_mod = require("draven.finding")
 	local total = line_count(bufnr)
 
 	for _, item in ipairs(session:findings({ path = file.path })) do
 		if item.lnum and item.lnum >= 1 and item.lnum <= total then
-			local label = ("  %s %s: %s"):format(
-				item.resolved and "✓" or "▎",
-				item.severity,
-				finding_mod.headline(item)
-			)
+			local hl = finding_highlight(item)
+			local badge = ("%s %s"):format(item.resolved and "✓" or "▎", item.severity)
 
-			pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
-				virt_text = { { label, finding_highlight(item) } },
-				virt_text_pos = "eol",
-				priority = 130,
-			})
+			if mode == "eol" then
+				local first = vim.split(item.body or "", "\n", { plain = true })[1] or ""
+				pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
+					virt_text = { { ("  %s: %s"):format(badge, vim.trim(first)), hl } },
+					virt_text_pos = "eol",
+					priority = 130,
+				})
+			else
+				local virt_lines = {}
+				local body = vim.split(vim.trim(item.body or ""), "\n", { plain = true })
+
+				for i, line in ipairs(body) do
+					local prefix = i == 1 and ("  %s  "):format(badge) or ("  %s  "):format(
+						string.rep(" ", vim.fn.strdisplaywidth(badge))
+					)
+					local text = prefix .. line
+					local pad = math.max(0, width - vim.fn.strdisplaywidth(text))
+					virt_lines[i] = { { text .. string.rep(" ", pad), hl } }
+				end
+
+				pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
+					virt_lines = virt_lines,
+					virt_lines_above = true,
+					priority = 130,
+				})
+			end
 		end
 	end
 end
@@ -308,7 +352,7 @@ function M.render(bufnr, file, session, opts)
 		render_hunk(bufnr, hunk, session:hunk_state(hunk), width)
 	end
 
-	render_findings(bufnr, file, session)
+	render_findings(bufnr, file, session, width)
 
 	-- Always computed, even when folding is off: the window's `foldenable` is
 	-- what decides, so it can be toggled without a re-render.

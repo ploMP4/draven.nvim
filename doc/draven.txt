@@ -156,9 +156,18 @@ of them to `false` in your config to skip it (|draven-configuration|).
 	<leader>rz	Toggle the unchanged-code folds.
 	<leader>rR	Rebuild from git, keeping every mark.
 	<leader>re	Jump to the panel.
+	<leader>rw	Hide the panel, or bring it back. The changeset tree
+			earns its width while you are choosing what to read,
+			and not while you are reading.
 	<leader>rq	Close the review and save.
 
-	<CR>		Panel only: open a file, or fold a directory.
+In the panel only:
+
+	<CR>		Open the file, or fold the directory.
+	h  l		Collapse / expand the directory under the cursor.
+			`l` on an already-open directory opens the file.
+	za		Fold the directory under the cursor.
+	zM  zR		Collapse / expand every directory.
 
 Everything else is ordinary Neovim.
 
@@ -280,9 +289,10 @@ Defaults shown. Pass any subset to `require("draven").setup()`. >lua
 	    },
 	    delta   = { max_width = 110, max_height = 30, border = "rounded"},
 	    comment = { width = 76, height = 8, border = "rounded" },
+	    winblend = 0,           -- float transparency
+	    finding_display = "above",  -- or "eol", or false
 	    fold_unchanged = true,
 	    fold_context = 6,
-	    finding_virt_text = true,
 	  },
 
 	  export = { register = "+", unresolved_only = true },
@@ -317,6 +327,8 @@ like the rest of your editor. All links are `default`, so your own
 	DravenSignUnread	DiagnosticHint
 	DravenSignStale		DiagnosticWarn
 	DravenSignBar		Comment
+	DravenSignAdd		DiffAdd
+	DravenSignDelete	DiffDelete
 
 	DravenPanelTitle	Title
 	DravenPanelBase		Comment
@@ -336,6 +348,11 @@ like the rest of your editor. All links are `default`, so your own
 	DravenFindingQuestion	DiagnosticWarn
 	DravenFindingNit	DiagnosticHint
 	DravenFindingResolved	NonText
+
+	DravenFloat		NormalFloat
+	DravenFloatBorder	FloatBorder
+	DravenFloatTitle	FloatTitle
+	DravenFloatFooter	FloatFooter
 
 	DravenDeltaAdd		DiffAdd
 	DravenDeltaDelete	DiffDelete

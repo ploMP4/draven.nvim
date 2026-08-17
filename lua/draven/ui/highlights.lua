@@ -15,12 +15,20 @@ local LINKS = {
 	DravenSignUnread = "DiagnosticHint",
 	DravenSignStale = "DiagnosticWarn",
 	DravenSignBar = "Comment",
+	DravenSignAdd = "DiffAdd",
+	DravenSignDelete = "DiffDelete",
 
 	-- Findings
 	DravenFindingBlocking = "DiagnosticError",
 	DravenFindingQuestion = "DiagnosticWarn",
 	DravenFindingNit = "DiagnosticHint",
 	DravenFindingResolved = "NonText",
+
+	-- Floats
+	DravenFloat = "NormalFloat",
+	DravenFloatBorder = "FloatBorder",
+	DravenFloatTitle = "FloatTitle",
+	DravenFloatFooter = "FloatFooter",
 
 	-- The v1→v2 delta
 	DravenDeltaAdd = "DiffAdd",
