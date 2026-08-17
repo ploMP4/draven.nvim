@@ -358,6 +358,18 @@ function M.comment()
 	})
 end
 
+---Collapse the finding under the cursor, or open it back up.
+function M.toggle_finding()
+	local item = finding_at_cursor()
+	if not item or not active then
+		log.info("no finding here")
+		return
+	end
+
+	active.session:toggle_collapsed(item.id)
+	active.view:redraw()
+end
+
 function M.toggle_resolved()
 	local item = finding_at_cursor()
 	if not item or not active then
@@ -872,6 +884,10 @@ actions = {
 	toggle_resolved = {
 		desc = "[R]eview [T]oggle finding resolved",
 		fn = M.toggle_resolved,
+	},
+	toggle_finding = {
+		desc = "[R]eview collapse or expand this finding",
+		fn = M.toggle_finding,
 	},
 	delete_finding = {
 		desc = "[R]eview delete finding",

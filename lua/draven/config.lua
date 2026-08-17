@@ -152,6 +152,7 @@ local defaults = {
 		list_findings = "<leader>rl",
 		export = "<leader>rx",
 		toggle_resolved = "<leader>rt",
+		toggle_finding = "<leader>rv",
 		delete_finding = "<leader>rX",
 		next_file = "]f",
 		prev_file = "[f",

@@ -149,6 +149,8 @@ of them to `false` in your config to skip it (|draven-configuration|).
 	<leader>rc	Write a finding on this line, or edit the one already
 			there. See |draven-findings|.
 	<leader>rt	Toggle the finding under the cursor resolved.
+	<leader>rv	Collapse the finding's box to one line, or open it.
+			Resolved findings collapse on their own.
 	<leader>rX	Delete the finding under the cursor.
 	<leader>rl	Load findings into the |quickfix| list.
 	<leader>rx	Copy findings as a prompt for your agent.
@@ -351,6 +353,9 @@ like the rest of your editor. All links are `default`, so your own
 	DravenFindingQuestion	DiagnosticWarn
 	DravenFindingNit	DiagnosticHint
 	DravenFindingResolved	NonText
+	DravenFindingBlockingBorder	DiagnosticError
+	DravenFindingQuestionBorder	DiagnosticWarn
+	DravenFindingNitBorder	DiagnosticHint
 
 	DravenFloat		NormalFloat
 	DravenFloatBorder	FloatBorder

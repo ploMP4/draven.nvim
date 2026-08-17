@@ -28,6 +28,10 @@ local LINKS = {
 	DravenFindingQuestion = "DiagnosticWarn",
 	DravenFindingNit = "DiagnosticHint",
 	DravenFindingResolved = "NonText",
+	-- The box drawn around a finding, dimmer than its text.
+	DravenFindingBlockingBorder = "DiagnosticError",
+	DravenFindingQuestionBorder = "DiagnosticWarn",
+	DravenFindingNitBorder = "DiagnosticHint",
 
 	-- Floats
 	DravenFloat = "NormalFloat",

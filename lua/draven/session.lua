@@ -343,6 +343,20 @@ function Session:update_finding(id, body, severity)
 	self:save_soon()
 end
 
+---Collapse a finding's box to a single line, or open it again.
+---@param id string
+---@return boolean|nil collapsed
+function Session:toggle_collapsed(id)
+	local item = self.state.findings and self.state.findings[id]
+	if not item then
+		return nil
+	end
+
+	item.collapsed = not item.collapsed or nil
+	self:save_soon()
+	return item.collapsed == true
+end
+
 ---@param id string
 ---@return boolean|nil resolved
 function Session:toggle_resolved(id)
