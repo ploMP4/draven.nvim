@@ -1,0 +1,78 @@
+local glob = require("draven.util.glob")
+local config = require("draven.config")
+local ignore = require("draven.core.ignore")
+
+describe("glob.match", function()
+	it("matches a bare filename at any depth with **/", function()
+		assert.is_true(glob.match("**/go.sum", "go.sum"))
+		assert.is_true(glob.match("**/go.sum", "svc/api/go.sum"))
+		assert.is_false(glob.match("**/go.sum", "go.sumx"))
+		assert.is_false(glob.match("**/go.sum", "notgo.sum"))
+	end)
+
+	it("stops * at a path separator", function()
+		assert.is_true(glob.match("*.lock", "a.lock"))
+		assert.is_false(glob.match("*.lock", "dir/a.lock"))
+		assert.is_true(glob.match("**/*.lock", "dir/a.lock"))
+	end)
+
+	it("matches a directory subtree", function()
+		assert.is_true(glob.match("**/node_modules/**", "node_modules/x/y.js"))
+		assert.is_true(glob.match("**/node_modules/**", "web/node_modules/x.js"))
+		assert.is_false(glob.match("**/node_modules/**", "web/node_modules"))
+	end)
+
+	it("matches a single character with ?", function()
+		assert.is_true(glob.match("a?.txt", "ab.txt"))
+		assert.is_false(glob.match("a?.txt", "abc.txt"))
+		assert.is_false(glob.match("a?.txt", "a/.txt"))
+	end)
+
+	it("treats regex metacharacters as literals", function()
+		assert.is_true(glob.match("a+b.txt", "a+b.txt"))
+		assert.is_false(glob.match("a+b.txt", "aab.txt"))
+		assert.is_true(glob.match("v1.2.txt", "v1.2.txt"))
+		assert.is_false(glob.match("v1.2.txt", "v1x2.txt"))
+	end)
+
+	it("does not escape underscores", function()
+		assert.is_true(glob.match("**/my_file.go", "pkg/my_file.go"))
+	end)
+end)
+
+describe("ignore.match", function()
+	before_each(function()
+		config.setup({})
+	end)
+
+	after_each(function()
+		config.setup({})
+	end)
+
+	it("ignores lockfiles and generated code by default", function()
+		assert.is_true(ignore.match("go.sum"))
+		assert.is_true(ignore.match("web/package-lock.json"))
+		assert.is_true(ignore.match("api/service.pb.go"))
+		assert.is_true(ignore.match("web/node_modules/react/index.js"))
+		assert.is_true(ignore.match("dist/bundle.js"))
+	end)
+
+	it("leaves real source alone", function()
+		assert.is_false(ignore.match("auth/token.go"))
+		assert.is_false(ignore.match("web/src/app.ts"))
+		assert.is_false(ignore.match("go.mod"))
+	end)
+
+	it("honours a replaced pattern list", function()
+		config.setup({ ignore = { patterns = { "**/*.md" } } })
+
+		assert.is_true(ignore.match("README.md"))
+		-- The defaults are replaced, not merged.
+		assert.is_false(ignore.match("go.sum"))
+	end)
+
+	it("can be turned off", function()
+		config.setup({ ignore = { enabled = false } })
+		assert.is_false(ignore.match("go.sum"))
+	end)
+end)
