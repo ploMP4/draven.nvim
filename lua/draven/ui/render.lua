@@ -185,6 +185,48 @@ local function render_hunk(bufnr, hunk, status, width)
 	end
 end
 
+---@param item draven.Finding
+---@return string
+local function finding_highlight(item)
+	if item.resolved then
+		return "DravenFindingResolved"
+	end
+	return ({
+		blocking = "DravenFindingBlocking",
+		question = "DravenFindingQuestion",
+		nit = "DravenFindingNit",
+	})[item.severity] or "DravenFindingBlocking"
+end
+
+---Findings sit at the end of the line they point at, so the code stays put.
+---@param bufnr integer
+---@param file draven.File
+---@param session draven.Session
+local function render_findings(bufnr, file, session)
+	if not config.options.ui.finding_virt_text then
+		return
+	end
+
+	local finding_mod = require("draven.finding")
+	local total = line_count(bufnr)
+
+	for _, item in ipairs(session:findings({ path = file.path })) do
+		if item.lnum and item.lnum >= 1 and item.lnum <= total then
+			local label = ("  %s %s: %s"):format(
+				item.resolved and "✓" or "▎",
+				item.severity,
+				finding_mod.headline(item)
+			)
+
+			pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, item.lnum - 1, 0, {
+				virt_text = { { label, finding_highlight(item) } },
+				virt_text_pos = "eol",
+				priority = 130,
+			})
+		end
+	end
+end
+
 ---Fold everything more than `fold_context` lines away from a hunk.
 ---@param bufnr integer
 ---@param file draven.File
@@ -265,6 +307,8 @@ function M.render(bufnr, file, session, opts)
 	for _, hunk in ipairs(file.hunks) do
 		render_hunk(bufnr, hunk, session:hunk_state(hunk), width)
 	end
+
+	render_findings(bufnr, file, session)
 
 	-- Always computed, even when folding is off: the window's `foldenable` is
 	-- what decides, so it can be toggled without a re-render.

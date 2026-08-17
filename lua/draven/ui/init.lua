@@ -271,6 +271,148 @@ function M.mark_all(reviewed)
 	log.info(("%d/%d hunks marked"):format(done, total))
 end
 
+--- Findings ------------------------------------------------------------------
+
+---The finding under the cursor, preferring an unresolved one.
+---@return draven.Finding|nil
+local function finding_at_cursor()
+	if not active or not active.view.file then
+		return nil
+	end
+	if vim.api.nvim_get_current_win() ~= active.view_win then
+		return nil
+	end
+
+	local lnum = vim.api.nvim_win_get_cursor(active.view_win)[1]
+	local items = active.session:findings_at(active.view.file.path, lnum)
+
+	for _, item in ipairs(items) do
+		if not item.resolved then
+			return item
+		end
+	end
+
+	return items[1]
+end
+
+---Write a finding against the line under the cursor, or edit the one there.
+function M.comment()
+	if not active then
+		return
+	end
+
+	if vim.api.nvim_get_current_win() ~= active.view_win then
+		focus_view()
+	end
+
+	local file = active.view.file
+	if not file then
+		return
+	end
+
+	local existing = finding_at_cursor()
+	local comment = require("draven.ui.comment")
+
+	if existing then
+		comment.open({
+			title = ("%s:%d"):format(existing.path, existing.lnum or 0),
+			body = existing.body,
+			severity = existing.severity,
+			on_submit = function(body, severity)
+				active.session:update_finding(existing.id, body, severity)
+				active.view:redraw()
+				repaint_panel()
+			end,
+		})
+		return
+	end
+
+	local lnum = vim.api.nvim_win_get_cursor(active.view_win)[1]
+	local hunk = active.session:hunk_at(file, lnum)
+
+	if not hunk then
+		log.info("findings attach to changed lines — move to a hunk first")
+		return
+	end
+
+	comment.open({
+		title = ("%s:%d"):format(file.path, lnum),
+		on_submit = function(body, severity)
+			if not active then
+				return
+			end
+			active.session:add_finding(hunk, lnum, { body = body, severity = severity })
+			active.view:redraw()
+			repaint_panel()
+		end,
+	})
+end
+
+function M.toggle_resolved()
+	local item = finding_at_cursor()
+	if not item or not active then
+		log.info("no finding here")
+		return
+	end
+
+	local resolved = active.session:toggle_resolved(item.id)
+	active.view:redraw()
+	repaint_panel()
+	log.info(resolved and "finding resolved" or "finding reopened")
+end
+
+function M.delete_finding()
+	local item = finding_at_cursor()
+	if not item or not active then
+		log.info("no finding here")
+		return
+	end
+
+	active.session:remove_finding(item.id)
+	active.view:redraw()
+	repaint_panel()
+	log.info("finding deleted")
+end
+
+---Load findings into the quickfix list.
+function M.list_findings()
+	if not active then
+		return
+	end
+
+	local count = require("draven.export").quickfix(active.session, { unresolved_only = false })
+	if count == 0 then
+		log.info("no findings yet")
+	end
+end
+
+---Put the review on the clipboard as a prompt for the agent.
+function M.export()
+	if not active then
+		return
+	end
+
+	local export = require("draven.export")
+	local text, count = export.prompt(active.session, {
+		unresolved_only = config.options.export.unresolved_only,
+	})
+
+	if count == 0 then
+		log.info("no findings to export")
+		return
+	end
+
+	if export.to_clipboard(text) then
+		log.info(("%d finding%s copied to register %s"):format(
+			count,
+			count == 1 and "" or "s",
+			config.options.export.register
+		))
+	else
+		log.error("could not write to register " .. config.options.export.register)
+	end
+end
+
 ---Show the delta between the approved version and what is there now.
 function M.show_delta()
 	if not active then
@@ -431,6 +573,7 @@ end
 ---@param review draven.Review
 local function teardown(review)
 	require("draven.ui.delta").close()
+	require("draven.ui.comment").close()
 
 	review.session:close()
 	review.view:close()
@@ -633,6 +776,26 @@ actions = {
 	delta = {
 		desc = "[R]eview [D]elta — what changed since you read it",
 		fn = M.show_delta,
+	},
+	comment = {
+		desc = "[R]eview [C]omment on this line",
+		fn = M.comment,
+	},
+	list_findings = {
+		desc = "[R]eview [L]ist findings in the quickfix list",
+		fn = M.list_findings,
+	},
+	export = {
+		desc = "[R]eview e[X]port findings as an agent prompt",
+		fn = M.export,
+	},
+	toggle_resolved = {
+		desc = "[R]eview [T]oggle finding resolved",
+		fn = M.toggle_resolved,
+	},
+	delete_finding = {
+		desc = "[R]eview delete finding",
+		fn = M.delete_finding,
 	},
 	next_stale = {
 		desc = "[R]eview next [S]tale hunk",

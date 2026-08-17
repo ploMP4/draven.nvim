@@ -43,6 +43,38 @@ function M.post_image(lines)
 	return out
 end
 
+---Buffer line numbers of each post-image line, positionally matching
+---`post_image`. This is how a finding's offset within a hunk becomes a
+---cursor position.
+---@param lines draven.DiffLine[]
+---@return integer[]
+function M.post_lnums(lines)
+	local out = {}
+	for _, l in ipairs(lines) do
+		if l.kind ~= "delete" then
+			out[#out + 1] = l.new_lnum
+		end
+	end
+	return out
+end
+
+---Where `lnum` sits within the hunk's post-image, or nil if it is outside.
+---@param lines draven.DiffLine[]
+---@param lnum integer
+---@return integer|nil
+function M.offset_of(lines, lnum)
+	local index = 0
+	for _, l in ipairs(lines) do
+		if l.kind ~= "delete" then
+			index = index + 1
+			if l.new_lnum == lnum then
+				return index
+			end
+		end
+	end
+	return nil
+end
+
 ---Lines as they existed before the change.
 ---@param lines draven.DiffLine[]
 ---@return string[]

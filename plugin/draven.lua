@@ -52,6 +52,14 @@ end, {
 	desc = "Toggle the review surface",
 })
 
+vim.api.nvim_create_user_command("DravenExport", function()
+	require("draven").export()
+end, { desc = "Copy the review's findings as a prompt for your agent" })
+
+vim.api.nvim_create_user_command("DravenFindings", function()
+	require("draven").findings()
+end, { desc = "Load the review's findings into the quickfix list" })
+
 vim.api.nvim_create_user_command("DravenStatus", function(cmd)
 	require("draven").status(cmd.args, { verbose = cmd.bang })
 end, {

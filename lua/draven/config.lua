@@ -101,10 +101,31 @@ local defaults = {
 			border = "rounded",
 		},
 
+		comment = {
+			width = 76,
+			height = 8,
+			border = "rounded",
+		},
+
+		-- Findings appear at the end of the line they point at.
+		finding_virt_text = true,
+
 		-- Unchanged code folds away so a 900-line file with three hunks reads
 		-- as three hunks. `zR` opens everything, as always.
 		fold_unchanged = true,
 		fold_context = 6,
+	},
+
+	export = {
+		-- `+` is the system clipboard; `"` the unnamed register.
+		register = "+",
+		-- Resolved findings stay in the state file but leave the prompt.
+		unresolved_only = true,
+	},
+
+	findings = {
+		-- New findings start here; cycle with <Tab> while composing.
+		default_severity = "blocking",
 	},
 
 	-- Buffer-local to the review tab. Set any entry to `false` to skip it.
@@ -118,6 +139,11 @@ local defaults = {
 		prev_hunk = "<leader>rp",
 		delta = "<leader>rd",
 		next_stale = "<leader>rs",
+		comment = "<leader>rc",
+		list_findings = "<leader>rl",
+		export = "<leader>rx",
+		toggle_resolved = "<leader>rt",
+		delete_finding = "<leader>rX",
 		next_file = "]f",
 		prev_file = "[f",
 		toggle_fold = "<leader>rz",

@@ -119,6 +119,16 @@ function Panel:render(session, active_path)
 	local progress_line = put(progress, { kind = "chrome" })
 	mark(progress_line, 0, #progress, "DravenPanelProgress")
 
+	local open_findings = #session:findings({ unresolved_only = true })
+	if open_findings > 0 then
+		local text = (" ! %d finding%s to send back"):format(
+			open_findings,
+			open_findings == 1 and "" or "s"
+		)
+		local lnum = put(text, { kind = "chrome" })
+		mark(lnum, 0, #text, "DravenFindingBlocking")
+	end
+
 	if stale > 0 then
 		-- Rewritten-since-you-read-it is the thing worth surfacing at the top.
 		local text = (" %s %d changed since you read %s"):format(
@@ -172,6 +182,10 @@ function Panel:render(session, active_path)
 				count = ("%d/%d"):format(done, all)
 			end
 
+			local _, unresolved = session:finding_counts(file.path)
+			local flag = unresolved > 0 and ("!%d "):format(unresolved) or ""
+			count = flag .. count
+
 			local budget = width - 6 - vim.fn.strdisplaywidth(count) - 1
 			name = fit(name, math.max(6, budget))
 
@@ -186,7 +200,11 @@ function Panel:render(session, active_path)
 
 			local name_col = 3 + #glyph + 1
 			mark(lnum, name_col, #name, file.ignored and "DravenPanelIgnored" or "DravenPanelFile")
-			mark(lnum, name_col + #name + pad, #count, "DravenPanelCount")
+			local count_col = name_col + #name + pad
+			if #flag > 0 then
+				mark(lnum, count_col, #flag, "DravenFindingBlocking")
+			end
+			mark(lnum, count_col + #flag, #count - #flag, "DravenPanelCount")
 
 			if active_path and file.path == active_path then
 				marks[#marks + 1] = { lnum = lnum, line_hl = "DravenPanelActive" }

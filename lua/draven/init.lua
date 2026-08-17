@@ -136,6 +136,16 @@ function M.is_open()
 	return require("draven.ui").is_open()
 end
 
+---Copy the open review's findings as a prompt for the agent.
+function M.export()
+	require("draven.ui").export()
+end
+
+---Load the open review's findings into the quickfix list.
+function M.findings()
+	require("draven.ui").list_findings()
+end
+
 ---Print a changeset summary without opening anything. Backs `:DravenStatus`.
 ---@param rev? string
 ---@param opts? { verbose?: boolean }

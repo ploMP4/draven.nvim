@@ -18,6 +18,13 @@ local LINKS = {
 	DravenSignStale = "DiagnosticWarn",
 	DravenSignBar = "Comment",
 
+	-- Findings
+	DravenFindingBlocking = "DiagnosticError",
+	DravenFindingQuestion = "DiagnosticWarn",
+	DravenFindingNit = "DiagnosticHint",
+	DravenFindingResolved = "NonText",
+	DravenFindingOrphaned = "NonText",
+
 	-- The v1→v2 delta
 	DravenDeltaAdd = "DiffAdd",
 	DravenDeltaDelete = "DiffDelete",

@@ -29,6 +29,7 @@ M.VERSION = 1
 ---@field created_at integer
 ---@field updated_at integer
 ---@field reviewed table<string, draven.MarkRecord>
+---@field findings table<string, draven.Finding>
 
 ---Stable, filesystem-safe name for a changeset's state file.
 ---@param cs draven.Changeset
@@ -70,6 +71,7 @@ local function empty(cs)
 		created_at = now,
 		updated_at = now,
 		reviewed = {},
+		findings = {},
 	}
 end
 
@@ -104,6 +106,7 @@ function M.load(cs)
 	-- `vim.json.decode` turns an empty object into an empty table, which Lua
 	-- cannot tell from an empty array; either way an empty map is correct.
 	decoded.reviewed = type(decoded.reviewed) == "table" and decoded.reviewed or {}
+	decoded.findings = type(decoded.findings) == "table" and decoded.findings or {}
 
 	return decoded
 end

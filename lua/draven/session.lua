@@ -4,6 +4,7 @@
 ---nothing in this file touches a window or a buffer.
 local anchor = require("draven.core.anchor")
 local config = require("draven.config")
+local finding_mod = require("draven.finding")
 local hunk_mod = require("draven.core.hunk")
 local log = require("draven.util.log")
 local state_store = require("draven.state")
@@ -104,6 +105,17 @@ function Session:_reclassify()
 	end
 end
 
+---Point every finding at whatever now holds the line it was written against.
+function Session:_reanchor_findings()
+	local changeset = require("draven.core.changeset")
+
+	for _, item in pairs(self.state.findings or {}) do
+		finding_mod.reanchor(item, changeset.file(self.changeset, item.path), {
+			base_stable = self.base_stable,
+		})
+	end
+end
+
 ---Rebuild the ordered hunk list. Call after replacing the changeset.
 function Session:reindex()
 	local changeset = require("draven.core.changeset")
@@ -118,6 +130,7 @@ function Session:reindex()
 	end
 
 	self:_reclassify()
+	self:_reanchor_findings()
 end
 
 ---Swap in a freshly built changeset, keeping every mark.
@@ -168,6 +181,128 @@ function Session:approved_image(hunk)
 		return nil
 	end
 	return state_store.read_snapshot(self.changeset, origin.content_hash)
+end
+
+--- Findings ------------------------------------------------------------------
+
+---Every finding, most severe first.
+---@param opts? { unresolved_only?: boolean, path?: string }
+---@return draven.Finding[]
+function Session:findings(opts)
+	opts = opts or {}
+	local out = {}
+
+	for _, item in pairs(self.state.findings or {}) do
+		local keep = true
+		if opts.unresolved_only and item.resolved then
+			keep = false
+		end
+		if opts.path and item.path ~= opts.path then
+			keep = false
+		end
+		if keep then
+			out[#out + 1] = item
+		end
+	end
+
+	table.sort(out, finding_mod.before)
+	return out
+end
+
+---@param path string
+---@param lnum integer
+---@return draven.Finding[]
+function Session:findings_at(path, lnum)
+	local out = {}
+	for _, item in pairs(self.state.findings or {}) do
+		if item.path == path and item.lnum == lnum then
+			out[#out + 1] = item
+		end
+	end
+	table.sort(out, finding_mod.before)
+	return out
+end
+
+---@param path string
+---@return integer total
+---@return integer unresolved
+---@return integer orphaned
+function Session:finding_counts(path)
+	local total, unresolved, orphaned = 0, 0, 0
+
+	for _, item in pairs(self.state.findings or {}) do
+		if item.path == path then
+			total = total + 1
+			if not item.resolved then
+				unresolved = unresolved + 1
+			end
+			if item.state == "orphaned" then
+				orphaned = orphaned + 1
+			end
+		end
+	end
+
+	return total, unresolved, orphaned
+end
+
+---@param hunk draven.Hunk
+---@param lnum integer
+---@param opts { body: string, severity: draven.Severity, span?: integer }
+---@return draven.Finding|nil
+function Session:add_finding(hunk, lnum, opts)
+	local item = finding_mod.create(hunk, lnum, opts)
+	if not item then
+		return nil
+	end
+
+	item.lnum, item.state = lnum, "anchored"
+
+	self.state.findings = self.state.findings or {}
+	self.state.findings[item.id] = item
+	self:save_soon()
+
+	return item
+end
+
+---@param id string
+---@return boolean removed
+function Session:remove_finding(id)
+	if not self.state.findings or not self.state.findings[id] then
+		return false
+	end
+
+	self.state.findings[id] = nil
+	self:save_soon()
+	return true
+end
+
+---@param id string
+---@param body string
+---@param severity draven.Severity
+function Session:update_finding(id, body, severity)
+	local item = self.state.findings and self.state.findings[id]
+	if not item then
+		return
+	end
+
+	item.body = body
+	item.severity = finding_mod.normalize_severity(severity)
+	item.updated_at = os.time()
+	self:save_soon()
+end
+
+---@param id string
+---@return boolean|nil resolved
+function Session:toggle_resolved(id)
+	local item = self.state.findings and self.state.findings[id]
+	if not item then
+		return nil
+	end
+
+	item.resolved = not item.resolved
+	item.updated_at = os.time()
+	self:save_soon()
+	return item.resolved
 end
 
 --- Marks ---------------------------------------------------------------------

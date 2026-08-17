@@ -12,9 +12,9 @@ draven marks **hunks** reviewed, keyed to a hash of their content. When the
 agent rewrites one hunk of a file you already read, the marks on the other
 hunks survive and only the changed one goes stale.
 
-> The thesis works end to end: mark hunks read, let the agent rewrite one,
-> and only that hunk goes stale — with a delta showing what changed against
-> the version you approved. Findings are still to come.
+> The full loop works: read the diff, leave findings, send them to the agent,
+> and on the next pass only what actually changed comes back — with your
+> findings still attached to the lines they were written about.
 
 ## Requirements
 
@@ -62,6 +62,11 @@ Buffer-local to the review:
 | `<leader>rn` / `<leader>rp` | next / previous unread hunk, across files |
 | `<leader>rd` | on a stale hunk: what changed since you approved it |
 | `<leader>rs` | jump to the next hunk the agent rewrote under you |
+| `<leader>rc` | write a finding on this line (or edit the one here) |
+| `<leader>rt` | mark the finding resolved |
+| `<leader>rX` | delete the finding |
+| `<leader>rl` | all findings into the quickfix list |
+| `<leader>rx` | copy findings as a prompt for the agent |
 | `]f` / `[f` | next / previous file |
 | `<leader>rz` | toggle the unchanged-code folds |
 | `<leader>rR` | rebuild from git, keeping every mark |
@@ -105,6 +110,45 @@ shows the delta rather than the whole hunk:
 ```
 
 So round three of a review costs you three lines instead of a file.
+
+### Findings
+
+`<leader>rc` opens a scratch buffer in a float — it is just text, so your
+insert mappings, abbreviations and undo all work. `<Tab>` cycles severity,
+`<C-s>` (or `:w`) saves, `<Esc>` throws it away. Findings show up at the end
+of the line they point at.
+
+They are anchored to a *line of code*, not a line number. When the agent
+rewrites the file, a finding follows the line it was written about; when that
+line is genuinely gone, it is marked orphaned rather than quietly re-pointed
+at whatever moved into its place.
+
+`<leader>rx` puts the lot on your clipboard as something you can paste
+straight into an agent:
+
+````markdown
+Code review of working tree against HEAD.
+
+4 of 12 hunks read; 3 findings below.
+Address them in order. Do not change anything else.
+
+## Blocking — these must be fixed
+
+### auth/token.go:52
+
+```go
+	if tok == "" {
+		return ErrEmpty
+	}
+```
+
+Returning here skips the audit log.
+Every other early return calls auditDenied().
+````
+
+Resolved findings stay in the state file but drop out of the prompt.
+`<leader>rl` puts them all in the quickfix list instead, typed by severity
+(`E`/`W`/`I`), so `]q` and `:cdo` work on them.
 
 ## API
 
@@ -224,8 +268,10 @@ uncertain the hunk goes stale. A false "unread" costs ten seconds; a false
 lua/draven/
 ├── init.lua              public API
 ├── config.lua            defaults and merge
-├── session.lua           a changeset joined to its marks
+├── session.lua           a changeset joined to its marks and findings
 ├── state.lua             JSON persistence, keyed by content hash
+├── finding.lua           findings and how they re-anchor
+├── export.lua            agent prompt, markdown, quickfix
 ├── health.lua            :checkhealth draven
 ├── core/                 pure model — no UI, no editor state
 │   ├── git.lua           async vim.system plumbing
@@ -240,6 +286,7 @@ lua/draven/
 │   ├── view.lua          the diff window and its buffers
 │   ├── render.lua        extmark decoration and folds
 │   ├── delta.lua         the v1→v2 float
+│   ├── comment.lua       composing a finding
 │   └── highlights.lua    groups, linked to your colorscheme
 └── util/                 async runtime, fs, glob, log
 ```
