@@ -113,6 +113,10 @@ function M.open(opts)
 	local submitted = false
 
 	local function submit()
+		-- <C-s> is mapped in insert mode too, and the mode outlives the float:
+		-- without this you land back on your own source file still inserting.
+		vim.cmd("stopinsert")
+
 		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 		local body = vim.trim(table.concat(lines, "\n"))
 
