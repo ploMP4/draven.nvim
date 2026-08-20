@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A new push to the same branch makes the in-flight run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: stylua
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check formatting
+        uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Pinned on purpose: a new stylua can reformat code that was already
+          # clean, and that should be a deliberate bump rather than a red CI
+          # run on a branch that changed nothing.
+          version: 2.5.2
+          args: --check lua/ plugin/ tests/
+
+  test:
+    name: test (nvim ${{ matrix.nvim }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One version failing should not hide the result on the others.
+      fail-fast: false
+      matrix:
+        # The documented minimum, whatever is current, and an early warning.
+        nvim: [v0.10.0, stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim }}
+
+      - name: Cache plenary.nvim
+        uses: actions/cache@v4
+        with:
+          path: .tests
+          key: plenary-${{ runner.os }}
+
+      - name: Run tests
+        run: make test
