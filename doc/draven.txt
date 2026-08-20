@@ -1,4 +1,4 @@
-*draven.txt*  A code review surface that remembers what you already read
+*draven.txt*  Review a diff and keep your place across rewrites
 
 Author:  ploMP4
 License: MIT
@@ -23,36 +23,23 @@ CONTENTS                                                     *draven-contents*
 ==============================================================================
 1. INTRODUCTION                                          *draven-introduction*
 
-draven is a code review surface for changes you did not write — typically an
-agent's. That job differs from reviewing a colleague's pull request in ways
-the tooling has to account for:
+draven reviews changes you did not write — typically an agent's. Review is
+iterative there: you read, you send findings back, the agent rewrites, you
+read again, three or four rounds on one changeset.
 
-  - You are the author of record but not the author. Every line needs reading.
-  - Diffs arrive large, fast, and across many files at once.
-  - Review is iterative. You read, you send findings back, the agent rewrites,
-    you read again. Three or four rounds on one changeset.
-  - The output of your review is usually a prompt, not a comment thread.
+Review state is content-addressed rather than file-addressed. Tools that mark
+"file viewed" drop the flag the moment the file changes, so the third pass
+costs as much as the first. draven marks hunks (|draven-states|), keyed to a
+hash of their content. When the agent rewrites one hunk of a file you already
+read, your marks on the rest survive, and the one that changed shows you a
+diff against the version you approved.
 
-The idea draven is built on: review state is content-addressed, not
-file-addressed.
+When anchoring is uncertain the hunk goes stale rather than staying marked
+read, so a mark never claims more than draven can prove.
 
-Other tools mark "file viewed" and drop the flag the moment the file changes,
-so round three of a review costs as much as round one. draven marks hunks
-(|draven-states|), keyed to a hash of their content. When the agent rewrites
-one hunk of a file you already read, your marks on the rest survive, and the
-one that changed shows you a diff against the version you approved.
-
-Two constraints shape everything else:
-
-Never claim something is reviewed when it is not.
-	When anchoring is uncertain, the hunk goes stale. A false "unread"
-	costs you seconds; a false "reviewed" costs you the trust that makes
-	the tool worth using.
-
-Do not fight Neovim.
-	The diff window shows your real file buffer with decorations on top,
-	never a copy. |gd|, hover, treesitter, |]c|, search and every mapping
-	you already have keep working.
+The diff window shows your real file buffer with decorations on top, never a
+copy, so |gd|, hover, treesitter, |]c|, search and every mapping you already
+have keep working.
 
 draven is not a git client. Staging, commits, branch management and conflict
 resolution are deliberately out of scope.
