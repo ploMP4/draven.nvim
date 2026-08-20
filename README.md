@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/ploMP4/draven.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/ploMP4/draven.nvim/actions/workflows/ci.yml)
 
-Review a diff in Neovim and keep your place across rewrites.
+Review a diff in Neovim, keep your place across rewrites, and export concise,
+structured feedback for the agent.
 
 ![draven.nvim demo](demo.gif)
 
