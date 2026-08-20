@@ -2,13 +2,16 @@
 
 Review a diff in Neovim and keep your place across rewrites.
 
-Reviewing code an agent wrote is iterative: you read, you send findings back,
-it rewrites, you read again. Tools that track review state per *file* drop the
-flag as soon as the file changes, so the third pass costs as much as the first.
+Reviewing code that an agent wrote is iterative. You read it, you send your
+findings back, it rewrites, and then you read it again, usually three or four
+times on the same changeset. Most tools track review state per file and drop
+the flag as soon as the file changes, so the third pass ends up costing you as
+much as the first one did.
 
-draven tracks state per **hunk**, keyed to a hash of the hunk's contents. When
-one hunk of a file you already read gets rewritten, the marks on the rest
-survive and only that hunk goes stale.
+draven tracks that state per hunk instead, keyed to a hash of the hunk's
+contents. When the agent rewrites one hunk of a file you have already read,
+your marks on the rest of it survive and only the hunk that actually changed
+goes stale.
 
 ## Requirements
 
@@ -18,7 +21,8 @@ survive and only that hunk goes stale.
 ## Install
 
 Install `ploMP4/draven` with your plugin manager of choice. Calling
-`require("draven").setup()` is optional — it only exists to change defaults.
+`require("draven").setup()` is optional, since it only exists to change the
+defaults.
 
 draven sets no global mappings, so bind opening a review yourself:
 
@@ -29,7 +33,7 @@ vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>", { desc = "[R]eview [O]pen" 
 ## Usage
 
 ```vim
-:Draven                  " working tree vs HEAD — the agent-output case
+:Draven                  " working tree vs HEAD, the usual case
 :Draven main             " working tree vs main
 :Draven HEAD~3..HEAD     " a commit range
 :Draven main...HEAD      " everything since the branch point
@@ -44,13 +48,14 @@ vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>", { desc = "[R]eview [O]pen" 
 
 `:help draven` has the rest.
 
-`:Draven` opens a tab: the changeset on the left, the diff on the right. The
-diff is your real file buffer with decorations on top, so `gd`, hover, `]c`,
-search and every mapping you already have keep working.
+`:Draven` opens a tab with the changeset on the left and the diff on the right.
+The diff is your real file buffer with decorations drawn on top of it, never a
+copy, so `gd`, hover, `]c`, search and every mapping you already have keep
+working.
 
 ### Keys
 
-Buffer-local to the review:
+These are all buffer-local to the review:
 
 | Key | Does |
 | --- | --- |
@@ -76,14 +81,15 @@ Buffer-local to the review:
 | `h` / `l` | panel only: collapse / expand the directory |
 | `zM` / `zR` | panel only: collapse / expand every directory |
 
-Progress is counted in hunks, not files: `2/5` on a file means three hunks in
-it are still unread. Unchanged code folds away by default, so a 900-line file
-with three hunks reads as three hunks.
+Progress is counted in hunks rather than files, so `2/5` on a file means that
+three of its hunks are still unread. Unchanged code is folded away by default,
+which means a 900-line file with three hunks in it reads as just those three
+hunks.
 
 ### The re-review loop
 
-Read a file, send findings to the agent, let it rewrite — then reopen or hit
-`<leader>rR`:
+Read a file, send your findings to the agent and let it rewrite. Then reopen
+the review, or hit `<leader>rR`:
 
 ```
  draven                                  ↻ marks a hunk that changed
@@ -95,8 +101,9 @@ Read a file, send findings to the agent, let it rewrite — then reopen or hit
    ↻ middleware.go            1/2
 ```
 
-The hunk you didn't touch stays `✓`. On the one that did change, `<leader>rd`
-shows the delta rather than the whole hunk:
+The hunk that was not touched stays `✓`. On the one that did change,
+`<leader>rd` shows you what changed since you approved it rather than the whole
+hunk again:
 
 ```
  ↻  auth/middleware.go · hunk 1
@@ -113,18 +120,18 @@ shows the delta rather than the whole hunk:
 
 ### Findings
 
-`<leader>rc` opens a scratch buffer in a float — it is just text, so your
-insert mappings, abbreviations and undo all work. `<Tab>` cycles severity,
-`<C-s>` (or `:w`) saves, `<Esc>` throws it away.
+`<leader>rc` opens a scratch buffer in a float. It is just text, so your insert
+mappings, abbreviations and undo all work in it. `<Tab>` cycles through the
+severities, `<C-s>` or `:w` saves, and `<Esc>` throws it away.
 
-Findings render above the line they point at, so a long line cannot hide
-them and a multi-line comment shows in full. `ui.finding_display = "eol"`
-puts them back at the end of the line.
+Findings are rendered above the line they point at, so a long line cannot hide
+them and a comment that spans several lines still shows in full. If you would
+rather have them at the end of the line, set `ui.finding_display = "eol"`.
 
-They are anchored to a *line of code*, not a line number. When the agent
-rewrites the file, a finding follows the line it was written about; when that
-line is genuinely gone, it is marked orphaned rather than quietly re-pointed
-at whatever moved into its place.
+They are anchored to a line of code rather than to a line number, so when the
+agent rewrites the file a finding follows the line it was written about. If
+that line is genuinely gone the finding is marked as orphaned, instead of
+being quietly re-pointed at whatever moved into its place.
 
 `<leader>rx` puts the lot on your clipboard as something you can paste
 straight into an agent:
@@ -149,9 +156,9 @@ Returning here skips the audit log.
 Every other early return calls auditDenied().
 ````
 
-Resolved findings stay in the state file but drop out of the prompt.
+Resolved findings stay in the state file but they are left out of the prompt.
 `<leader>rl` puts them all in the quickfix list instead, typed by severity
-(`E`/`W`/`I`), so `]q` and `:cdo` work on them.
+(`E`, `W` or `I`), so `]q` and `:cdo` work on them.
 
 ## API
 
@@ -182,13 +189,13 @@ A changeset is plain data:
 }
 ```
 
-Each file carries `path`, `old_path`, `status`
-(`added`/`modified`/`deleted`/`renamed`/`copied`/`mode`), `binary`, `untracked`,
-`ignored`, and its hunks. Each hunk carries its line ranges, its parsed lines
-with both old and new line numbers, and the two keys review state hangs off:
-`content_hash` (exact) and `anchor_key` (whitespace-insensitive, so a reformat
-does not lose your marks). `:help draven-states` covers how a hunk ends up
-reviewed, stale or unread.
+Each file carries `path`, `old_path`, `status` (`added`, `modified`, `deleted`,
+`renamed`, `copied` or `mode`), `binary`, `untracked`, `ignored`, and its
+hunks. Each hunk carries its line ranges, its parsed lines with both the old
+and the new line numbers, and the two keys that review state hangs off. Those
+are `content_hash`, which is exact, and `anchor_key`, which ignores whitespace
+so that reformatting does not lose your marks. `:help draven-states` explains
+how a hunk ends up reviewed, stale or unread.
 
 Iterate every reviewable hunk, ignored files skipped:
 
@@ -206,7 +213,7 @@ Defaults shown:
 require("draven").setup({
   base = "HEAD",              -- default base for a working-tree review
   context = 3,                -- lines of context per hunk
-  include_untracked = true,   -- new files an agent created are the point
+  include_untracked = true,   -- new files the agent created count too
   max_file_bytes = 1024*1024, -- larger untracked files are listed, not read
   log_level = vim.log.levels.INFO,
 
@@ -231,13 +238,14 @@ require("draven").setup({
 })
 ```
 
-Review state lives in `<gitdir>/draven/<revspec>.json` — plain JSON, one file
-per review target, keyed by content hash.
+Review state lives in `<gitdir>/draven/<revspec>.json`. It is plain JSON, one
+file per review target, keyed by content hash.
 
-Ignored files stay visible in the changeset but are excluded from the totals,
-so a regenerated lockfile cannot make review progress look worse.
-`ignore.patterns` replaces the default list rather than extending it; glob
-syntax is `**/` (zero or more directories), `**`, `*` and `?`.
+Ignored files stay visible in the changeset but they are left out of the
+totals, so a regenerated lockfile cannot make your review progress look worse
+than it is. Note that `ignore.patterns` replaces the default list rather than
+extending it. The glob syntax supports `**/` for zero or more directories,
+along with `**`, `*` and `?`.
 
 ## Development
 

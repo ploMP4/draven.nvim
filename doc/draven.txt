@@ -23,19 +23,22 @@ CONTENTS                                                     *draven-contents*
 ==============================================================================
 1. INTRODUCTION                                          *draven-introduction*
 
-draven reviews changes you did not write — typically an agent's. Review is
-iterative there: you read, you send findings back, the agent rewrites, you
-read again, three or four rounds on one changeset.
+draven reviews changes you did not write yourself, typically an agent's.
+Review there is iterative. You read the code, you send your findings back,
+the agent rewrites, and then you read it again, usually three or four rounds
+on the same changeset.
 
 Review state is content-addressed rather than file-addressed. Tools that mark
 "file viewed" drop the flag the moment the file changes, so the third pass
-costs as much as the first. draven marks hunks (|draven-states|), keyed to a
+ends up costing as much as the first one did. draven marks hunks
+(|draven-states|), keyed to a
 hash of their content. When the agent rewrites one hunk of a file you already
 read, your marks on the rest survive, and the one that changed shows you a
 diff against the version you approved.
 
-When anchoring is uncertain the hunk goes stale rather than staying marked
-read, so a mark never claims more than draven can prove.
+When anchoring is uncertain the hunk goes stale rather than staying marked as
+read, so that a mark never tells you something is reviewed when draven cannot
+actually confirm it.
 
 The diff window shows your real file buffer with decorations on top, never a
 copy, so |gd|, hover, treesitter, |]c|, search and every mapping you already
@@ -73,9 +76,9 @@ buffer-local to the review, so a mapping for opening one is left to you: >lua
 :Draven [{revspec}]
 		Open the review, or focus it if it is already open.
 
-		With no argument, reviews the working tree against HEAD —
-		including untracked files, which is where an agent's new files
-		show up. Otherwise {revspec} may be:
+		With no argument, reviews the working tree against HEAD,
+		including untracked files, since that is where an agent's
+		new files show up. Otherwise {revspec} may be:
 
 		  {rev}		working tree against {rev}
 		  {a}..{b}	the commits between {a} and {b}
@@ -114,9 +117,10 @@ buffer-local to the review, so a mapping for opening one is left to you: >lua
 ==============================================================================
 5. MAPPINGS                                                  *draven-mappings*
 
-These are buffer-local to the review — both the panel and whichever file the
-diff window is showing — and are removed again when the review closes. Set any
-of them to `false` in your config to skip it (|draven-configuration|).
+These are buffer-local to the review, meaning both the panel and whichever
+file the diff window is showing, and they are removed again when the review
+closes. Set any of them to `false` in your config to skip it
+(|draven-configuration|).
 
 	<leader>rr	Mark the hunk read, then jump to the next unread one.
 			This is the key you will spend the most time on.
@@ -177,10 +181,10 @@ reads as three hunks. |zR| opens everything, as always.
 The states are decided by content, in order of confidence:
 
 reviewed
-	The hunk's content hash matches a mark. Or its whitespace-normalised
-	hash does, which means the code says the same thing and only its
-	formatting moved — a gofmt run over reviewed code does not un-review
-	it.
+	The hunk's content hash matches a mark, or its whitespace-normalised
+	hash does, which means the code still says the same thing and only
+	its formatting moved. A gofmt run over reviewed code does not
+	un-review it.
 
 stale
 	A mark covers the same lines *of the base revision*, so this hunk is a
@@ -195,16 +199,16 @@ unread
 	Neither. You have never seen this code.
 
 On a stale hunk, `<leader>rd` shows what changed between the version you
-approved and what is on disk now — usually a few lines, rather than the whole
-hunk again. That comparison needs the bytes you approved, which draven stores
-when you mark a hunk (|draven-state|).
+approved and what is on disk now, which is usually a few lines rather than
+the whole hunk again. That comparison needs the bytes you approved, which
+draven stores when you mark a hunk (|draven-state|).
 
                                                            *draven-base-moved*
-When the base revision itself moves — you commit, you rebase — every recorded
-old-side address points somewhere else. draven drops them rather than trusting
-them, tells you how many marks were affected, and falls back to content
-addressing alone. Marks still hold; only the ability to say "this is a rewrite
-of that" is lost.
+When the base revision itself moves, because you committed or rebased, every
+recorded old-side address points somewhere else. draven drops them rather
+than trusting them, tells you how many marks were affected, and falls back to
+content addressing alone. Your marks still hold, and the only thing lost is
+the ability to say that one hunk is a rewrite of another.
 
 ==============================================================================
 7. FINDINGS                                                  *draven-findings*
@@ -220,9 +224,9 @@ Saved findings appear at the end of the line they point at, and are counted in
 the panel.
 
                                                             *draven-anchoring*
-A finding is anchored to a line of code, not a line number — for the same
-reason marks are content-addressed. Re-anchoring after a rewrite tries, in
-order:
+A finding is anchored to a line of code rather than to a line number, for the
+same reason that marks are content-addressed. Re-anchoring after a rewrite
+tries, in order:
 
 	1. The hunk it was written against, if that hunk is unchanged.
 	2. Whatever now covers the same region of the base revision, searched
@@ -247,8 +251,8 @@ Resolved findings stay in the state file but drop out of the prompt. Set
 `export.unresolved_only = false` to include them.
 
 `<leader>rl` (or |:DravenFindings|) loads findings into the |quickfix| list
-instead, typed by severity — blocking as `E`, question as `W`, nit as `I` — so
-|:cnext|, |:cdo| and your existing quickfix mappings work on them.
+instead, typed by severity, with blocking as `E`, question as `W` and nit as
+`I`, so |:cnext|, |:cdo| and your existing quickfix mappings work on them.
 
 ==============================================================================
 9. CONFIGURATION                                        *draven-configuration*
@@ -463,14 +467,16 @@ Nothing is written outside the git directory, and nothing is committed.
 13. TROUBLESHOOTING                                   *draven-troubleshooting*
 
 Everything went unread after I committed.
-	Not quite — see |draven-base-moved|. Marks whose content still matches
-	are kept; what is lost is the ability to recognise a rewrite. This is
-	expected: old-side line numbers mean nothing against a new base.
+	Not quite, see |draven-base-moved|. Marks whose content still
+	matches are kept, and what is lost is the ability to recognise a
+	rewrite. That is expected, because old-side line numbers mean
+	nothing against a new base.
 
 A hunk I definitely read came back as stale.
-	Something in it changed. `<leader>rd` shows exactly what. If the delta
-	looks like pure whitespace, the reformat was large enough that the
-	normalised hash could not match either — mark it read again.
+	Something in it changed, and `<leader>rd` shows exactly what. If the
+	delta looks like pure whitespace, the reformat was large enough that
+	the normalised hash could not match either, so just mark it read
+	again.
 
 My finding says "orphaned".
 	The line it pointed at no longer exists anywhere in the file's diff.
