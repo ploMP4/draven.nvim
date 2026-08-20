@@ -1,8 +1,10 @@
-# draven
+# draven.nvim
 
 [![CI](https://github.com/ploMP4/draven.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/ploMP4/draven.nvim/actions/workflows/ci.yml)
 
 Review a diff in Neovim and keep your place across rewrites.
+
+![draven.nvim demo](demo.gif)
 
 Reviewing code that an agent wrote is iterative. You read it, you send your
 findings back, it rewrites, and then you read it again, usually three or four
