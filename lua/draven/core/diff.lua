@@ -238,7 +238,9 @@ function M.parse(text)
 					file.status = "copied"
 				elseif line:sub(1, 17) == "similarity index " then
 					file.similarity = tonumber(line:match("(%d+)%%"))
-				elseif line:sub(1, 13) == "Binary files " or line:sub(1, 16) == "GIT binary patch" then
+				elseif
+					line:sub(1, 13) == "Binary files " or line:sub(1, 16) == "GIT binary patch"
+				then
 					file.binary = true
 				end
 			end

@@ -92,7 +92,8 @@ function M.lines(cs)
 		elseif f.skipped then
 			detail = f.skipped
 		elseif #f.hunks == 0 then
-			detail = f.status == "mode" and ("mode %s → %s"):format(f.old_mode or "?", f.new_mode or "?")
+			detail = f.status == "mode"
+					and ("mode %s → %s"):format(f.old_mode or "?", f.new_mode or "?")
 				or "no content change"
 		else
 			detail = ("%d hunk%s  +%d/-%d"):format(
@@ -164,7 +165,9 @@ function M.reset(opts)
 		local path = state.path(cs)
 
 		if vim.fn.filereadable(path) == 0 then
-			log.info("no saved review state for " .. (cs.revspec.arg ~= "" and cs.revspec.arg or "HEAD"))
+			log.info(
+				"no saved review state for " .. (cs.revspec.arg ~= "" and cs.revspec.arg or "HEAD")
+			)
 			return
 		end
 

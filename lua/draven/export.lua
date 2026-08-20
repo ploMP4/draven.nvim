@@ -82,12 +82,14 @@ function M.prompt(session, opts)
 	local reviewed, total = session:progress()
 	put(("Code review of %s."):format(scope(session)))
 	put("")
-	put(("%d of %d hunks read; %d finding%s below."):format(
-		reviewed,
-		total,
-		#items,
-		#items == 1 and "" or "s"
-	))
+	put(
+		("%d of %d hunks read; %d finding%s below."):format(
+			reviewed,
+			total,
+			#items,
+			#items == 1 and "" or "s"
+		)
+	)
 	put("Address them in order. Do not change anything else.")
 
 	for _, severity in ipairs(finding_mod.SEVERITIES) do
@@ -100,7 +102,9 @@ function M.prompt(session, opts)
 				put("")
 
 				local where = item.lnum and ("%s:%d"):format(item.path, item.lnum)
-					or ("%s (line unknown — the code it referred to has changed)"):format(item.path)
+					or ("%s (line unknown — the code it referred to has changed)"):format(
+						item.path
+					)
 				put(("### %s"):format(where))
 
 				if opts.include_excerpt then

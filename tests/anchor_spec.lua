@@ -95,8 +95,10 @@ describe("anchor.classify", function()
 			anchor_key = "anchor-merged",
 		})
 
-		local small = mark({ content_hash = "small", anchor_key = "k1", old_start = 10, old_count = 2 })
-		local big = mark({ content_hash = "big", anchor_key = "k2", old_start = 15, old_count = 10 })
+		local small =
+			mark({ content_hash = "small", anchor_key = "k1", old_start = 10, old_count = 2 })
+		local big =
+			mark({ content_hash = "big", anchor_key = "k2", old_start = 15, old_count = 10 })
 
 		local status, origin = anchor.classify(h, { small, big }, {})
 		assert.equals("stale", status)

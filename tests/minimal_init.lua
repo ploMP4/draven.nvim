@@ -14,7 +14,9 @@ local function find_plenary()
 		end
 	end
 
-	for _, path in ipairs(vim.fn.glob(vim.fn.stdpath("data") .. "/site/pack/*/start/plenary.nvim", true, true)) do
+	for _, path in
+		ipairs(vim.fn.glob(vim.fn.stdpath("data") .. "/site/pack/*/start/plenary.nvim", true, true))
+	do
 		if vim.fn.isdirectory(path) == 1 then
 			return path
 		end

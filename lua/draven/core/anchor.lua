@@ -83,7 +83,8 @@ function M.classify(hunk, marks, opts)
 	local origin, best = nil, 0
 	for _, mark in ipairs(marks) do
 		if mark.old_start then
-			local shared = M.overlap(mark.old_start, mark.old_count or 0, hunk.old_start, hunk.old_count)
+			local shared =
+				M.overlap(mark.old_start, mark.old_count or 0, hunk.old_start, hunk.old_count)
 			if shared > best then
 				origin, best = mark, shared
 			end

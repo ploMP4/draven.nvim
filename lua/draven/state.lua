@@ -96,10 +96,12 @@ function M.load(cs)
 	end
 
 	if decoded.version ~= M.VERSION then
-		log.warn(("state file is version %s, expected %d — starting fresh"):format(
-			tostring(decoded.version),
-			M.VERSION
-		))
+		log.warn(
+			("state file is version %s, expected %d — starting fresh"):format(
+				tostring(decoded.version),
+				M.VERSION
+			)
+		)
 		return empty(cs)
 	end
 

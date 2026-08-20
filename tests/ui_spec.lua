@@ -102,7 +102,9 @@ describe("render", function()
 
 		local function sign_texts()
 			local out = {}
-			for _, m in ipairs(vim.api.nvim_buf_get_extmarks(bufnr, render.ns, 0, -1, { details = true })) do
+			for _, m in
+				ipairs(vim.api.nvim_buf_get_extmarks(bufnr, render.ns, 0, -1, { details = true }))
+			do
 				if m[4].sign_text then
 					out[#out + 1] = vim.trim(m[4].sign_text)
 				end

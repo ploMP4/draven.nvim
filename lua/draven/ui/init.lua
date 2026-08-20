@@ -425,11 +425,13 @@ function M.export()
 	end
 
 	if export.to_clipboard(text) then
-		log.info(("%d finding%s copied to register %s"):format(
-			count,
-			count == 1 and "" or "s",
-			config.options.export.register
-		))
+		log.info(
+			("%d finding%s copied to register %s"):format(
+				count,
+				count == 1 and "" or "s",
+				config.options.export.register
+			)
+		)
 	else
 		log.error("could not write to register " .. config.options.export.register)
 	end

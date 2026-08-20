@@ -185,7 +185,11 @@ function M.open(session, hunk)
 		"DravenDeltaHeader"
 	)
 	put(
-		("approved %s · +%d/-%d since"):format(ago(os.time() - (origin.at or os.time())), added, removed),
+		("approved %s · +%d/-%d since"):format(
+			ago(os.time() - (origin.at or os.time())),
+			added,
+			removed
+		),
 		"DravenDeltaMeta"
 	)
 

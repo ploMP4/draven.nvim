@@ -196,9 +196,12 @@ describe("state persistence", function()
 		local cs = helpers.build(repo)
 
 		assert.is_truthy(state_store.path(cs):match("%.git/draven/worktree@HEAD%.json$"))
-		assert.equals("range@main...HEAD", state_store.key({
-			revspec = { kind = "range", arg = "main...HEAD", base = "main" },
-		}))
+		assert.equals(
+			"range@main...HEAD",
+			state_store.key({
+				revspec = { kind = "range", arg = "main...HEAD", base = "main" },
+			})
+		)
 	end)
 
 	it("round-trips marks across sessions", function()
@@ -229,7 +232,10 @@ describe("state persistence", function()
 		local path = state_store.path(cs)
 
 		vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
-		vim.fn.writefile({ vim.json.encode({ version = 999, reviewed = { abc = { at = 1 } } }) }, path)
+		vim.fn.writefile(
+			{ vim.json.encode({ version = 999, reviewed = { abc = { at = 1 } } }) },
+			path
+		)
 
 		local session = session_mod.new(cs)
 		assert.same({}, session.state.reviewed)

@@ -16,7 +16,7 @@ describe("diff.parse", function()
 			" \tclaims, err := parse(tok)",
 			"-\tif err != nil {",
 			"+\tif err != nil || claims == nil {",
-			"+\t\tlog.Warn(\"bad token\")",
+			'+\t\tlog.Warn("bad token")',
 			" \t\treturn ErrInvalid",
 			" \t}",
 			"",

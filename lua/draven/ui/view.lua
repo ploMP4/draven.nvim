@@ -94,7 +94,8 @@ function View:_buffer_for(file)
 			"draven://binary/" .. file.path,
 			{ "", ("  %s"):format(file.path), "", "  Binary file — nothing to read here." },
 			nil
-		), false
+		),
+			false
 	end
 
 	if file.skipped then
@@ -103,7 +104,8 @@ function View:_buffer_for(file)
 			("  %s"):format(file.path),
 			"",
 			("  Not read: %s."):format(file.skipped),
-		}, nil), false
+		}, nil),
+			false
 	end
 
 	-- Deleted: the only content is the pre-image, from the base revision.

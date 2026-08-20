@@ -86,7 +86,7 @@ describe("changeset.build", function()
 			"package auth",
 			"",
 			"func Validate(tok string) error {",
-			"\tif tok == \"\" {",
+			'\tif tok == "" {',
 			"\t\treturn ErrEmpty",
 			"\t}",
 			"\treturn nil",
@@ -98,7 +98,7 @@ describe("changeset.build", function()
 			"package auth",
 			"",
 			"func Validate(tok string) error {",
-			"\tif strings.TrimSpace(tok) == \"\" {",
+			'\tif strings.TrimSpace(tok) == "" {',
 			"\t\treturn ErrEmpty",
 			"\t}",
 			"\treturn nil",
@@ -140,7 +140,10 @@ describe("changeset.build", function()
 		assert.equals(3, f.added)
 		assert.equals(1, #f.hunks)
 		assert.equals(3, f.hunks[1].new_count)
-		assert.same({ "alpha", "beta", "gamma" }, require("draven.core.hunk").post_image(f.hunks[1].lines))
+		assert.same(
+			{ "alpha", "beta", "gamma" },
+			require("draven.core.hunk").post_image(f.hunks[1].lines)
+		)
 	end)
 
 	it("can leave untracked files out", function()
@@ -300,9 +303,12 @@ describe("changeset.build", function()
 		repo:write("m.txt", { "two" })
 
 		local cs = build(repo)
-		assert.same({ "a.txt", "m.txt", "z.txt" }, vim.tbl_map(function(f)
-			return f.path
-		end, cs.files))
+		assert.same(
+			{ "a.txt", "m.txt", "z.txt" },
+			vim.tbl_map(function(f)
+				return f.path
+			end, cs.files)
+		)
 	end)
 end)
 

@@ -33,11 +33,9 @@ function M.check()
 		local dir = git_dir .. "/draven"
 		if vim.fn.isdirectory(dir) == 1 then
 			local reviews = vim.fn.glob(dir .. "/*.json", true, true)
-			health.info(("%d saved review%s in %s"):format(
-				#reviews,
-				#reviews == 1 and "" or "s",
-				dir
-			))
+			health.info(
+				("%d saved review%s in %s"):format(#reviews, #reviews == 1 and "" or "s", dir)
+			)
 		else
 			health.info("no reviews saved yet for this repository")
 		end
@@ -51,7 +49,9 @@ function M.check()
 
 	local ignore_count = #config.options.ignore.patterns
 	if config.options.ignore.enabled then
-		health.ok(("%d ignore pattern%s active"):format(ignore_count, ignore_count == 1 and "" or "s"))
+		health.ok(
+			("%d ignore pattern%s active"):format(ignore_count, ignore_count == 1 and "" or "s")
+		)
 	else
 		health.info("ignore rules are disabled")
 	end

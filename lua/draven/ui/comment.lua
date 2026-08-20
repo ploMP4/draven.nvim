@@ -36,7 +36,10 @@ local function set_footer(win, severity, editing)
 	vim.api.nvim_win_set_config(win, {
 		footer = {
 			{ " " .. severity .. " ", hl },
-			{ "<Tab> severity  <C-s> " .. (editing and "save" or "add") .. "  <Esc> cancel ", "Comment" },
+			{
+				"<Tab> severity  <C-s> " .. (editing and "save" or "add") .. "  <Esc> cancel ",
+				"Comment",
+			},
 		},
 		footer_pos = "right",
 	})
@@ -48,14 +51,21 @@ function M.open(opts)
 	M.close()
 
 	local ui = config.options.ui.comment
-	local severity = finding_mod.normalize_severity(opts.severity or config.options.findings.default_severity)
+	local severity =
+		finding_mod.normalize_severity(opts.severity or config.options.findings.default_severity)
 	local editing = opts.body ~= nil and opts.body ~= ""
 
 	local bufnr = vim.api.nvim_create_buf(false, true)
 	vim.bo[bufnr].buftype = "acwrite"
 	vim.bo[bufnr].bufhidden = "wipe"
 	vim.bo[bufnr].filetype = "markdown"
-	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(opts.body or "", "\n", { plain = true }))
+	vim.api.nvim_buf_set_lines(
+		bufnr,
+		0,
+		-1,
+		false,
+		vim.split(opts.body or "", "\n", { plain = true })
+	)
 	pcall(vim.api.nvim_buf_set_name, bufnr, "draven://finding")
 
 	local width = math.min(ui.width, math.max(40, vim.o.columns - 8))

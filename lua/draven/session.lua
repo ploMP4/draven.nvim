@@ -74,10 +74,12 @@ function Session:_settle_base()
 	self.base_stable = true
 
 	if dropped > 0 then
-		log.info(("base revision moved — %d mark%s can no longer be traced to a rewrite"):format(
-			dropped,
-			dropped == 1 and "" or "s"
-		))
+		log.info(
+			("base revision moved — %d mark%s can no longer be traced to a rewrite"):format(
+				dropped,
+				dropped == 1 and "" or "s"
+			)
+		)
 		self:save_soon()
 	end
 end
