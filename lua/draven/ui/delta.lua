@@ -156,7 +156,10 @@ function M.open_hunk(hunk)
 		end
 	end
 
-	put((" %s · hunk %d · %d deleted"):format(hunk.path, hunk.index, hunk.removed), "DravenDeltaHeader")
+	put(
+		(" %s · hunk %d · %d deleted"):format(hunk.path, hunk.index, hunk.removed),
+		"DravenDeltaHeader"
+	)
 	put(" " .. string.rep("─", 32), "DravenDeltaMeta")
 	for _, line in ipairs(hunk.lines) do
 		if line.kind == "delete" then

@@ -119,7 +119,8 @@ describe("readme", function()
 
 	it("documents every keymap action", function()
 		local source = table.concat(vim.fn.readfile(root .. "/lua/draven/ui/init.lua"), "\n")
-		local action_table = assert(source:match("%-%-%- Action table.-\nactions = {(.-)\n}\n\nreturn M"))
+		local action_table =
+			assert(source:match("%-%-%- Action table.-\nactions = {(.-)\n}\n\nreturn M"))
 		local text = table.concat(vim.fn.readfile(readme), "\n")
 
 		local missing = {}

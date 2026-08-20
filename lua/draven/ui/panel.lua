@@ -291,7 +291,12 @@ function Panel:render(session, active_path)
 			local location = ("%s:%d"):format(item.path, item.last_lnum or 1)
 			local text = "   " .. fit(location .. " · " .. finding_mod.headline(item), width - 3)
 			local row = put(text, { kind = "finding", finding = item })
-			mark(row, 3, #text - 3, item.resolved and "DravenFindingResolved" or "DravenFindingQuestion")
+			mark(
+				row,
+				3,
+				#text - 3,
+				item.resolved and "DravenFindingResolved" or "DravenFindingQuestion"
+			)
 		end
 	end
 

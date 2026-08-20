@@ -219,7 +219,10 @@ describe("render", function()
 		assert.is_truthy(text:find("▾", 1, true))
 		assert.is_truthy(text:find("final words", 1, true))
 		for _, line in ipairs(vim.split(text, "\n", { plain = true })) do
-			assert.is_true(vim.fn.strdisplaywidth(line) <= 32, ("finding row is too wide: %q"):format(line))
+			assert.is_true(
+				vim.fn.strdisplaywidth(line) <= 32,
+				("finding row is too wide: %q"):format(line)
+			)
 		end
 	end)
 
