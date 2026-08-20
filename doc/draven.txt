@@ -58,13 +58,36 @@ Run |:checkhealth| draven to verify.
 ==============================================================================
 3. SETUP                                                        *draven-setup*
 
-Install `ploMP4/draven` with your plugin manager of choice.
+The repository is `ploMP4/draven.nvim`. Calling |draven.setup()| is optional,
+since it only exists to change the defaults. See |draven-configuration|.
 
-Calling |draven.setup()| is optional; it only exists to change defaults. See
-|draven-configuration|.
+With lazy.nvim: >lua
 
+	{
+	  "ploMP4/draven.nvim",
+	  cmd = { "Draven", "DravenToggle", "DravenStatus" },
+	  keys = {
+	    { "<leader>ro", "<cmd>Draven<cr>", desc = "[R]eview [O]pen" },
+	  },
+	  opts = {},
+	}
+<
+With packer.nvim: >lua
+
+	use({
+	  "ploMP4/draven.nvim",
+	  config = function()
+	    require("draven").setup()
+	  end,
+	})
+<
+With vim-plug: >vim
+
+	Plug 'ploMP4/draven.nvim'
+<
 draven sets no global mappings of its own. Everything in |draven-mappings| is
-buffer-local to the review, so a mapping for opening one is left to you: >lua
+buffer-local to the review, so unless you let lazy.nvim define one through
+`keys` above, a mapping for opening a review is left to you: >lua
 
 	vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>")
 <

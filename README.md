@@ -1,5 +1,7 @@
 # draven
 
+[![CI](https://github.com/ploMP4/draven.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/ploMP4/draven.nvim/actions/workflows/ci.yml)
+
 Review a diff in Neovim and keep your place across rewrites.
 
 Reviewing code that an agent wrote is iterative. You read it, you send your
@@ -20,11 +22,41 @@ goes stale.
 
 ## Install
 
-Install `ploMP4/draven` with your plugin manager of choice. Calling
-`require("draven").setup()` is optional, since it only exists to change the
-defaults.
+Calling `require("draven").setup()` is optional, since it only exists to
+change the defaults.
 
-draven sets no global mappings, so bind opening a review yourself:
+### [lazy.nvim](https://github.com/folke/lazy.nvim)
+
+```lua
+{
+  "ploMP4/draven.nvim",
+  cmd = { "Draven", "DravenToggle", "DravenStatus" },
+  keys = {
+    { "<leader>ro", "<cmd>Draven<cr>", desc = "[R]eview [O]pen" },
+  },
+  opts = {},
+}
+```
+
+### [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+use({
+  "ploMP4/draven.nvim",
+  config = function()
+    require("draven").setup()
+  end,
+})
+```
+
+### [vim-plug](https://github.com/junegunn/vim-plug)
+
+```vim
+Plug 'ploMP4/draven.nvim'
+```
+
+draven sets no global mappings of its own, so unless you let lazy.nvim define
+one through `keys` above, bind opening a review yourself:
 
 ```lua
 vim.keymap.set("n", "<leader>ro", "<cmd>Draven<cr>", { desc = "[R]eview [O]pen" })
