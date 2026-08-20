@@ -3,7 +3,7 @@ local async = require("draven.util.async")
 
 local M = {}
 
-M.version = "0.2.0"
+M.version = "0.1.0"
 
 ---@param opts? table
 function M.setup(opts)
