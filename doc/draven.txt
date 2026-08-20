@@ -18,7 +18,6 @@ CONTENTS                                                     *draven-contents*
  10. Highlights ................................... |draven-highlights|
  11. Lua API ...................................... |draven-api|
  12. Stored state ................................. |draven-state|
- 13. Troubleshooting .............................. |draven-troubleshooting|
 
 ==============================================================================
 1. INTRODUCTION                                          *draven-introduction*
@@ -487,37 +486,5 @@ one file, and orphans are pruned when a review closes. Hunks larger than
 will say so.
 
 Nothing is written outside the git directory, and nothing is committed.
-
-==============================================================================
-13. TROUBLESHOOTING                                   *draven-troubleshooting*
-
-Everything went unread after I committed.
-	Not quite, see |draven-base-moved|. Marks whose content still
-	matches are kept, and what is lost is the ability to recognise a
-	rewrite. That is expected, because old-side line numbers mean
-	nothing against a new base.
-
-A hunk I definitely read came back as stale.
-	Something in it changed, and `<leader>rd` shows exactly what. If the
-	delta looks like pure whitespace, the reformat was large enough that
-	the normalised hash could not match either, so just mark it read
-	again.
-
-My finding says "orphaned".
-	The line it pointed at no longer exists anywhere in the file's diff.
-	The text is kept, along with where it used to be, so you can still act
-	on it. See |draven-anchoring|.
-
-The panel says a file is ignored.
-	It matched an `ignore.patterns` glob. You can still open it; it just
-	does not count toward progress. See |draven-ignore|.
-
-Opening a review says "no changes to review".
-	The working tree matches the base. Try a |:Draven| {revspec}.
-
-Nothing folds.
-	`ui.fold_unchanged` may be off, or |zi| toggled folding. Note that
-	folding only hides code more than `ui.fold_context` lines from a hunk,
-	so a small file with scattered changes has nothing to fold.
 
 vim:tw=78:ts=8:noet:ft=help:norl:
