@@ -1,21 +1,14 @@
 # draven
 
-A code review surface for Neovim that remembers what you already read.
+Review a diff in Neovim and keep your place across rewrites.
 
-Reviewing code an agent wrote is not the same job as reviewing a colleague's
-pull request. Diffs arrive large and across many files, and review is
-iterative — you read, you send findings back, the agent rewrites, you read
-again. Every existing tool marks *"file viewed"* and drops the flag the moment
-the file changes, so round three costs as much as round one.
+Reviewing code an agent wrote is iterative: you read, you send findings back,
+it rewrites, you read again. Tools that track review state per *file* drop the
+flag as soon as the file changes, so the third pass costs as much as the first.
 
-draven marks **hunks** reviewed, keyed to a hash of their content. When the
-agent rewrites one hunk of a file you already read, the marks on the other
-hunks survive and only the changed one goes stale.
-
-> The full loop works: read the diff, leave findings, send them to the agent,
-> and on the next pass only what actually changed comes back — with your
-> findings still attached to the lines they were written about. `:help draven`
-> covers the rest.
+draven tracks state per **hunk**, keyed to a hash of the hunk's contents. When
+one hunk of a file you already read gets rewritten, the marks on the rest
+survive and only that hunk goes stale.
 
 ## Requirements
 
@@ -89,8 +82,8 @@ with three hunks reads as three hunks.
 
 ### The re-review loop
 
-This is the part nothing else does. Read a file, send findings to the agent,
-let it rewrite — then reopen or hit `<leader>rR`:
+Read a file, send findings to the agent, let it rewrite — then reopen or hit
+`<leader>rR`:
 
 ```
  draven                                  ↻ marks a hunk that changed
@@ -117,8 +110,6 @@ shows the delta rather than the whole hunk:
  +		 return ErrEmpty.WithContext(r)
    	 }
 ```
-
-So round three of a review costs you three lines instead of a file.
 
 ### Findings
 
@@ -195,25 +186,9 @@ Each file carries `path`, `old_path`, `status`
 (`added`/`modified`/`deleted`/`renamed`/`copied`/`mode`), `binary`, `untracked`,
 `ignored`, and its hunks. Each hunk carries its line ranges, its parsed lines
 with both old and new line numbers, and the two keys review state hangs off:
-
-| Key | Normalisation | Used for |
-| --- | --- | --- |
-| `content_hash` | none — exact post-image | equal means definitely unchanged |
-| `anchor_key` | indent reduced to a nesting level, trailing whitespace and blank lines dropped | surviving a reformat |
-
-A hunk is then one of three things, decided in order of confidence:
-
-| | |
-| --- | --- |
-| `reviewed` | its `content_hash` matches a mark — or its `anchor_key` does, meaning only whitespace moved |
-| `stale` | a mark covers the same lines *of the base revision*, so this is a rewrite of something you approved |
-| `unread` | neither: you have never seen this code |
-
-Step two leans on the one coordinate system that holds still. New-side line
-numbers shift every time the agent touches a file, but every hunk in a review
-is a diff against the **same base revision**, so its old-side range is a fixed
-address. When the base itself moves — you commit, you rebase — that reasoning
-is void, and draven drops the recorded addresses rather than guessing.
+`content_hash` (exact) and `anchor_key` (whitespace-insensitive, so a reformat
+does not lose your marks). `:help draven-states` covers how a hunk ends up
+reviewed, stale or unread.
 
 Iterate every reviewable hunk, ignored files skipped:
 
@@ -260,59 +235,9 @@ Review state lives in `<gitdir>/draven/<revspec>.json` — plain JSON, one file
 per review target, keyed by content hash.
 
 Ignored files stay visible in the changeset but are excluded from the totals,
-so a regenerated lockfile can never make review progress look worse.
+so a regenerated lockfile cannot make review progress look worse.
 `ignore.patterns` replaces the default list rather than extending it; glob
 syntax is `**/` (zero or more directories), `**`, `*` and `?`.
-
-## Design
-
-Two constraints drive everything:
-
-**Never claim something is reviewed when it isn't.** When anchoring is
-uncertain the hunk goes stale. A false "unread" costs ten seconds; a false
-"reviewed" costs trust, and an untrustworthy review tool is worthless.
-
-**Don't fight Neovim.** Rendering will be decoration-only over real buffers, so
-`gd`, LSP, treesitter and your own keymaps keep working. That constraint is why
-`core/` contains no Neovim UI calls at all.
-
-```
-lua/draven/
-├── init.lua              public API
-├── config.lua            defaults and merge
-├── session.lua           a changeset joined to its marks and findings
-├── state.lua             JSON persistence, keyed by content hash
-├── finding.lua           findings and how they re-anchor
-├── export.lua            agent prompt, markdown, quickfix
-├── health.lua            :checkhealth draven
-├── core/                 pure model — no UI, no editor state
-│   ├── git.lua           async vim.system plumbing
-│   ├── diff.lua          unified diff parser
-│   ├── hunk.lua          hunk model + content addressing
-│   ├── anchor.lua        reviewed / stale / unread, and why
-│   ├── changeset.lua     the assembled review target
-│   └── ignore.lua        generated-file rules
-├── ui/
-│   ├── init.lua          the review tab: layout, keymaps, actions
-│   ├── panel.lua         the changeset tree
-│   ├── view.lua          the diff window and its buffers
-│   ├── render.lua        extmark decoration and folds
-│   ├── delta.lua         the v1→v2 float
-│   ├── comment.lua       composing a finding
-│   └── highlights.lua    groups, linked to your colorscheme
-└── util/                 async runtime, fs, glob, log
-```
-
-Measured on nvim-treesitter `HEAD~300..HEAD` — 257 files, 607 hunks:
-
-| | |
-| --- | --- |
-| open the review | 170 ms |
-| mark a hunk, with a full panel repaint | 6 ms |
-| `<leader>ra` (mark all 607) | 630 ms |
-
-`mark_all` is the outlier: it writes one snapshot per approved hunk. It is a
-bulk escape hatch, not part of the normal loop.
 
 ## Development
 
@@ -321,8 +246,3 @@ make test    # clones plenary into .tests/ if you don't already have it
 make lint    # stylua --check
 make fmt
 ```
-
-## Scope
-
-Deliberately out of scope: staging, commits, branch management, conflict
-resolution. draven is not a git client.
