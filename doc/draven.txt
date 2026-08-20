@@ -148,14 +148,10 @@ closes. Set any of them to `false` in your config to skip it
 	<leader>rr	Mark the hunk read, then jump to the next unread one.
 			This is the key you will spend the most time on.
 			In the panel, marks the whole file.
-	<leader>rf	Mark every hunk in the file read.
 	<leader>ru	Unmark the hunk.
-	<leader>ra	Mark everything read.
 
 	<leader>rn	Next hunk that still needs reading, across files.
 	<leader>rp	Previous one.
-	<leader>rs	Next hunk that changed since you read it.
-	]f  [f		Next / previous file.
 
 	<leader>rd	On a stale hunk: what changed since you approved it.
 			See |draven-states|.
@@ -163,27 +159,21 @@ closes. Set any of them to `false` in your config to skip it
 	<leader>rc	Write a finding on this line, or edit the one already
 			there. See |draven-findings|.
 	<leader>rt	Toggle the finding under the cursor resolved.
-	<leader>rv	Collapse the finding's box to one line, or open it.
-			Resolved findings collapse on their own.
-	<leader>rX	Delete the finding under the cursor.
-	<leader>rl	Load findings into the |quickfix| list.
+	<leader>rq	Load findings into the |quickfix| list.
 	<leader>rx	Copy findings as a prompt for your agent.
 
-	<leader>rz	Toggle the unchanged-code folds.
 	<leader>rR	Rebuild from git, keeping every mark.
-	<leader>re	Jump to the panel.
 	<leader>rw	Hide the panel, or bring it back. The changeset tree
 			earns its width while you are choosing what to read,
 			and not while you are reading.
-	<leader>rq	Close the review and save.
 
 In the panel only:
 
 	<CR>		Open the file, or fold the directory.
-	h  l		Collapse / expand the directory under the cursor.
-			`l` on an already-open directory opens the file.
-	za		Fold the directory under the cursor.
-	zM  zR		Collapse / expand every directory.
+
+Use Neovim's normal window and fold commands for everything else. Less common
+operations are available through commands. Every action can still be assigned
+explicitly in `keymaps`; see |draven-configuration|.
 
 Everything else is ordinary Neovim.
 
@@ -273,7 +263,7 @@ one carrying its file, line and a code excerpt.
 Resolved findings stay in the state file but drop out of the prompt. Set
 `export.unresolved_only = false` to include them.
 
-`<leader>rl` (or |:DravenFindings|) loads findings into the |quickfix| list
+`<leader>rq` (or |:DravenFindings|) loads findings into the |quickfix| list
 instead, typed by severity, with blocking as `E`, question as `W` and nit as
 `I`, so |:cnext|, |:cdo| and your existing quickfix mappings work on them.
 
@@ -514,7 +504,7 @@ Opening a review says "no changes to review".
 	The working tree matches the base. Try a |:Draven| {revspec}.
 
 Nothing folds.
-	`ui.fold_unchanged` may be off, or `<leader>rz` toggled it. Note that
+	`ui.fold_unchanged` may be off, or |zi| toggled folding. Note that
 	folding only hides code more than `ui.fold_context` lines from a hunk,
 	so a small file with scattered changes has nothing to fold.
 

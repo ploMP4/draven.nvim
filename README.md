@@ -89,29 +89,39 @@ working.
 
 These are all buffer-local to the review:
 
-| Key | Does |
+| Key | Action | Does |
+| --- | --- | --- |
+| `<leader>rr` | `mark_hunk` | mark the hunk read, then jump to the next unread one |
+| `<leader>ru` | `unmark_hunk` | unmark the hunk |
+| `<leader>rn` | `next_hunk` | jump to the next unread hunk, across files |
+| `<leader>rp` | `prev_hunk` | jump to the previous unread hunk, across files |
+| `<leader>rd` | `delta` | show what changed in a stale hunk since you approved it |
+| `<leader>rc` | `comment` | write a finding on this line, or edit the one here |
+| `<leader>rt` | `toggle_resolved` | toggle the finding resolved |
+| `<leader>rq` | `list_findings` | load all findings into the quickfix list |
+| `<leader>rx` | `export` | copy findings as a prompt for the agent |
+| `<leader>rR` | `refresh` | rebuild from git, keeping every mark |
+| `<leader>rw` | `toggle_panel` | hide the panel, or bring it back |
+| `<CR>` | `open_entry` | panel only: open a file, or fold a directory |
+
+Use Neovim's normal window and fold commands for everything else. Less common
+operations are available through commands or can be assigned in `keymaps` if
+you want them.
+
+The following actions have no default mapping, but can be enabled the same way:
+
+| Action | Does |
 | --- | --- |
-| `<leader>rr` | mark the hunk read, then jump to the next unread one |
-| `<leader>rf` | mark the whole file read |
-| `<leader>ru` | unmark the hunk |
-| `<leader>ra` | mark everything read |
-| `<leader>rn` / `<leader>rp` | next / previous unread hunk, across files |
-| `<leader>rd` | on a stale hunk: what changed since you approved it |
-| `<leader>rs` | jump to the next hunk the agent rewrote under you |
-| `<leader>rc` | write a finding on this line (or edit the one here) |
-| `<leader>rt` | mark the finding resolved |
-| `<leader>rX` | delete the finding |
-| `<leader>rl` | all findings into the quickfix list |
-| `<leader>rx` | copy findings as a prompt for the agent |
-| `]f` / `[f` | next / previous file |
-| `<leader>rz` | toggle the unchanged-code folds |
-| `<leader>rR` | rebuild from git, keeping every mark |
-| `<leader>re` | jump to the panel |
-| `<leader>rw` | hide the panel, or bring it back |
-| `<leader>rq` | close and save |
-| `<CR>` | panel only: open a file, or fold a directory |
-| `h` / `l` | panel only: collapse / expand the directory |
-| `zM` / `zR` | panel only: collapse / expand every directory |
+| `mark_file` / `mark_all` | mark the current file / entire review read |
+| `next_stale` | jump to the next stale hunk |
+| `toggle_finding` | collapse or expand the finding under the cursor |
+| `delete_finding` | delete the finding under the cursor |
+| `next_file` / `prev_file` | move between files |
+| `toggle_fold` | toggle unchanged-code folds |
+| `focus_panel` | focus the changeset panel |
+| `quit` | close the review and save |
+| `collapse_dir` / `expand_dir` / `toggle_dir` | change the panel directory fold |
+| `collapse_all` / `expand_all` | fold or unfold every panel directory |
 
 Progress is counted in hunks rather than files, so `2/5` on a file means that
 three of its hunks are still unread. Unchanged code is folded away by default,
@@ -165,8 +175,8 @@ agent rewrites the file a finding follows the line it was written about. If
 that line is genuinely gone the finding is marked as orphaned, instead of
 being quietly re-pointed at whatever moved into its place.
 
-`<leader>rx` puts the lot on your clipboard as something you can paste
-straight into an agent:
+`<leader>rx` (or `:DravenExport`) puts the lot on your clipboard as something
+you can paste straight into an agent:
 
 ````markdown
 Code review of working tree against HEAD.
@@ -189,8 +199,8 @@ Every other early return calls auditDenied().
 ````
 
 Resolved findings stay in the state file but they are left out of the prompt.
-`<leader>rl` puts them all in the quickfix list instead, typed by severity
-(`E`, `W` or `I`), so `]q` and `:cdo` work on them.
+`<leader>rq` (or `:DravenFindings`) puts them all in the quickfix list instead,
+typed by severity (`E`, `W` or `I`), so `]q` and `:cdo` work on them.
 
 ## API
 

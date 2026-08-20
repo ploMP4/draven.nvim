@@ -116,4 +116,19 @@ describe("readme", function()
 
 		assert.same({}, missing, "commands missing from the README")
 	end)
+
+	it("documents every keymap action", function()
+		local source = table.concat(vim.fn.readfile(root .. "/lua/draven/ui/init.lua"), "\n")
+		local action_table = assert(source:match("%-%-%- Action table.-\nactions = {(.-)\n}\n\nreturn M"))
+		local text = table.concat(vim.fn.readfile(readme), "\n")
+
+		local missing = {}
+		for action in action_table:gmatch("\n\t([%w_]+) = {") do
+			if not text:find("`" .. action .. "`", 1, true) then
+				missing[#missing + 1] = action
+			end
+		end
+
+		assert.same({}, missing, "keymap actions missing from the README")
+	end)
 end)
