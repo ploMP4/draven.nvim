@@ -109,6 +109,13 @@ function M.load(cs)
 	-- cannot tell from an empty array; either way an empty map is correct.
 	decoded.reviewed = type(decoded.reviewed) == "table" and decoded.reviewed or {}
 	decoded.findings = type(decoded.findings) == "table" and decoded.findings or {}
+	-- Resolved findings used to be collapsed only at render time. Materialise
+	-- that old implicit state so users can now expand one and persist `false`.
+	for _, finding in pairs(decoded.findings) do
+		if finding.resolved and finding.collapsed == nil then
+			finding.collapsed = true
+		end
+	end
 
 	return decoded
 end

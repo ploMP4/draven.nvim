@@ -22,6 +22,7 @@ M.SEVERITIES = { "blocking", "question", "nit" }
 ---@field severity draven.Severity
 ---@field body string
 ---@field resolved boolean
+---@field collapsed boolean|nil
 ---@field created_at integer
 ---@field updated_at integer
 ---@field hunk_hash string # content_hash of the hunk it was written against
@@ -80,6 +81,8 @@ function M.create(hunk, lnum, opts)
 		severity = M.normalize_severity(opts.severity),
 		body = opts.body,
 		resolved = false,
+		-- Keep the source compact until the reviewer asks for the full body.
+		collapsed = true,
 		created_at = os.time(),
 		updated_at = os.time(),
 		hunk_hash = hunk.content_hash,
@@ -219,6 +222,22 @@ function M.headline(finding)
 	local first = vim.split(finding.body or "", "\n", { plain = true })[1] or ""
 	first = vim.trim(first)
 	return first ~= "" and first or "(no description)"
+end
+
+---The line used to display and operate on a finding. Orphans deliberately do
+---not regain an anchor, but their last known line is still a useful place to
+---show the warning when that file remains in the changeset.
+---@param finding draven.Finding
+---@param line_count integer
+---@return integer|nil
+function M.display_lnum(finding, line_count)
+	if finding.lnum then
+		return math.max(1, math.min(finding.lnum, line_count))
+	end
+	if finding.state == "orphaned" and finding.last_lnum then
+		return math.max(1, math.min(finding.last_lnum, line_count))
+	end
+	return nil
 end
 
 ---Sort key: blocking before question before nit, then by file and line.

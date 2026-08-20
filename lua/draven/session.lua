@@ -354,7 +354,7 @@ function Session:toggle_collapsed(id)
 		return nil
 	end
 
-	item.collapsed = not item.collapsed or nil
+	item.collapsed = item.collapsed ~= true
 	self:save_soon()
 	return item.collapsed == true
 end
@@ -368,6 +368,9 @@ function Session:toggle_resolved(id)
 	end
 
 	item.resolved = not item.resolved
+	if item.resolved then
+		item.collapsed = true
+	end
 	item.updated_at = os.time()
 	self:_index_findings()
 	self:save_soon()

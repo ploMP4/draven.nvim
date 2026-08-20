@@ -1,6 +1,7 @@
 ---The review tabpage: panel, diff window, keymaps and the actions they call.
 local config = require("draven.config")
 local changeset_mod = require("draven.core.changeset")
+local finding_mod = require("draven.finding")
 local highlights = require("draven.ui.highlights")
 local hunk_mod = require("draven.core.hunk")
 local log = require("draven.util.log")
@@ -286,15 +287,29 @@ end
 ---The finding under the cursor, preferring an unresolved one.
 ---@return draven.Finding|nil
 local function finding_at_cursor()
-	if not active or not active.view.file then
+	if not active then
 		return nil
 	end
-	if vim.api.nvim_get_current_win() ~= active.view_win then
+
+	local win = vim.api.nvim_get_current_win()
+	if win == active.panel_win then
+		local lnum = vim.api.nvim_win_get_cursor(active.panel_win)[1]
+		local entry = active.panel:entry_at(lnum)
+		return entry and entry.kind == "finding" and entry.finding or nil
+	end
+
+	if win ~= active.view_win or not active.view.file or not active.view.bufnr then
 		return nil
 	end
 
 	local lnum = vim.api.nvim_win_get_cursor(active.view_win)[1]
-	local items = active.session:findings_at(active.view.file.path, lnum)
+	local total = vim.api.nvim_buf_line_count(active.view.bufnr)
+	local items = {}
+	for _, item in ipairs(active.session:findings({ path = active.view.file.path })) do
+		if finding_mod.display_lnum(item, total) == lnum then
+			items[#items + 1] = item
+		end
+	end
 
 	for _, item in ipairs(items) do
 		if not item.resolved then
@@ -305,9 +320,37 @@ local function finding_at_cursor()
 	return items[1]
 end
 
+---@param existing draven.Finding
+local function edit_finding(existing)
+	local comment = require("draven.ui.comment")
+	comment.open({
+		title = ("%s:%d%s"):format(
+			existing.path,
+			existing.lnum or existing.last_lnum or 0,
+			existing.state == "orphaned" and " · orphaned" or ""
+		),
+		body = existing.body,
+		severity = existing.severity,
+		on_submit = function(body, severity)
+			if not active then
+				return
+			end
+			active.session:update_finding(existing.id, body, severity)
+			active.view:redraw()
+			repaint_panel()
+		end,
+	})
+end
+
 ---Write a finding against the line under the cursor, or edit the one there.
 function M.comment()
 	if not active then
+		return
+	end
+
+	local existing = finding_at_cursor()
+	if existing then
+		edit_finding(existing)
 		return
 	end
 
@@ -320,22 +363,7 @@ function M.comment()
 		return
 	end
 
-	local existing = finding_at_cursor()
 	local comment = require("draven.ui.comment")
-
-	if existing then
-		comment.open({
-			title = ("%s:%d"):format(existing.path, existing.lnum or 0),
-			body = existing.body,
-			severity = existing.severity,
-			on_submit = function(body, severity)
-				active.session:update_finding(existing.id, body, severity)
-				active.view:redraw()
-				repaint_panel()
-			end,
-		})
-		return
-	end
 
 	local lnum = vim.api.nvim_win_get_cursor(active.view_win)[1]
 	local hunk = active.session:hunk_at(file, lnum)
@@ -366,8 +394,9 @@ function M.toggle_finding()
 		return
 	end
 
-	active.session:toggle_collapsed(item.id)
+	local collapsed = active.session:toggle_collapsed(item.id)
 	active.view:redraw()
+	log.info(collapsed and "finding collapsed" or "finding expanded")
 end
 
 function M.toggle_resolved()
@@ -532,6 +561,8 @@ function M.open_entry()
 		pcall(vim.api.nvim_win_set_cursor, active.panel_win, { lnum, 0 })
 	elseif entry.kind == "file" then
 		show_file(entry.file)
+	elseif entry.kind == "finding" then
+		edit_finding(entry.finding)
 	end
 end
 
@@ -795,12 +826,11 @@ function M.open(opts)
 			return
 		end
 
-		if #cs.files == 0 then
+		local session = session_mod.new(cs)
+		if #cs.files == 0 and #session:findings() == 0 then
 			log.info("no changes to review")
 			return
 		end
-
-		local session = session_mod.new(cs)
 
 		active = build_layout(session)
 		active.rev = opts.rev
@@ -814,8 +844,10 @@ function M.open(opts)
 		local entry = session:first_target()
 		if entry then
 			show_file(entry.file, { hunk = entry.hunk })
-		else
+		elseif cs.files[1] then
 			show_file(cs.files[1])
+		else
+			M.focus_panel()
 		end
 	end)
 end
@@ -888,7 +920,7 @@ actions = {
 		fn = M.toggle_resolved,
 	},
 	toggle_finding = {
-		desc = "[R]eview collapse or expand this finding",
+		desc = "[R]eview [V]iew finding body",
 		fn = M.toggle_finding,
 	},
 	delete_finding = {

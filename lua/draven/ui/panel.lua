@@ -3,6 +3,7 @@
 ---A normal buffer with its own filetype, so window navigation, search and your
 ---own mappings all behave. It owns no state beyond what it is told to draw.
 local config = require("draven.config")
+local finding_mod = require("draven.finding")
 
 local M = {}
 
@@ -38,9 +39,10 @@ end
 M.ns = vim.api.nvim_create_namespace("draven.panel")
 
 ---@class draven.PanelEntry
----@field kind "chrome"|"dir"|"file"
+---@field kind "chrome"|"dir"|"file"|"finding"
 ---@field dir string|nil
 ---@field file draven.File|nil
+---@field finding draven.Finding|nil
 
 ---@class draven.Panel
 ---@field bufnr integer
@@ -269,6 +271,27 @@ function Panel:render(session, active_path)
 			if active_path and file.path == active_path then
 				marks[#marks + 1] = { lnum = lnum, line_hl = "DravenPanelActive" }
 			end
+		end
+	end
+
+	local orphans = {}
+	for _, item in ipairs(session:findings()) do
+		if item.state == "orphaned" then
+			orphans[#orphans + 1] = item
+		end
+	end
+
+	if #orphans > 0 then
+		local title = (" ⚠ orphaned findings · %d"):format(#orphans)
+		local shown = fit(title, width)
+		local lnum = put(shown, { kind = "chrome" })
+		mark(lnum, 1, #shown - 1, "DravenFindingQuestion")
+
+		for _, item in ipairs(orphans) do
+			local location = ("%s:%d"):format(item.path, item.last_lnum or 1)
+			local text = "   " .. fit(location .. " · " .. finding_mod.headline(item), width - 3)
+			local row = put(text, { kind = "finding", finding = item })
+			mark(row, 3, #text - 3, item.resolved and "DravenFindingResolved" or "DravenFindingQuestion")
 		end
 	end
 

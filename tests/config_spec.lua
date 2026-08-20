@@ -4,6 +4,7 @@ describe("default keymaps", function()
 	it("only maps the core review loop", function()
 		assert.same({
 			comment = "<leader>rc",
+			delete_finding = "<leader>rX",
 			delta = "<leader>rd",
 			export = "<leader>rx",
 			list_findings = "<leader>rq",
@@ -12,6 +13,7 @@ describe("default keymaps", function()
 			open_entry = "<CR>",
 			prev_hunk = "<leader>rp",
 			refresh = "<leader>rR",
+			toggle_finding = "<leader>rv",
 			toggle_panel = "<leader>rw",
 			toggle_resolved = "<leader>rt",
 			unmark_hunk = "<leader>ru",

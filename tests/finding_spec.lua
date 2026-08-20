@@ -211,6 +211,21 @@ describe("findings", function()
 		assert.equals(0, #session:findings_at("auth/token.go", item.lnum + 500))
 	end)
 
+	it("persists explicit collapsed and expanded states", function()
+		local item = add("v1-two", "details", "blocking")
+		assert.is_true(item.collapsed)
+
+		assert.is_false(session:toggle_collapsed(item.id))
+		assert.is_false(item.collapsed)
+		assert.is_true(session:toggle_collapsed(item.id))
+		assert.is_true(item.collapsed)
+
+		assert.is_false(session:toggle_collapsed(item.id))
+		assert.is_true(session:toggle_resolved(item.id))
+		assert.is_true(item.collapsed, "resolving a finding should compact it")
+		assert.is_false(session:toggle_collapsed(item.id), "resolved findings remain expandable")
+	end)
+
 	it("edits and deletes", function()
 		local item = add("v1-two", "first draft", "nit")
 

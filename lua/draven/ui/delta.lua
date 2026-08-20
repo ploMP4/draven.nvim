@@ -109,6 +109,8 @@ local function float(lines, marks, title)
 		border = ui.border,
 		title = " " .. title .. " ",
 		title_pos = "center",
+		footer = " j/k scroll  q close ",
+		footer_pos = "right",
 	})
 
 	vim.wo[open_win].wrap = false
@@ -141,11 +143,43 @@ local function float(lines, marks, title)
 	})
 end
 
+---Show a hunk in a real buffer. This is the escape hatch for large deletion
+---blocks: virtual lines have no cursor positions and cannot be traversed when
+---they are taller than the window, while every row here scrolls normally.
+---@param hunk draven.Hunk
+function M.open_hunk(hunk)
+	local lines, marks = {}, {}
+	local function put(text, group)
+		lines[#lines + 1] = text
+		if group then
+			marks[#marks + 1] = { lnum = #lines, group = group }
+		end
+	end
+
+	put((" %s · hunk %d · %d deleted"):format(hunk.path, hunk.index, hunk.removed), "DravenDeltaHeader")
+	put(" " .. string.rep("─", 32), "DravenDeltaMeta")
+	for _, line in ipairs(hunk.lines) do
+		if line.kind == "delete" then
+			put("-" .. line.text, "DravenDeltaDelete")
+		elseif line.kind == "add" then
+			put("+" .. line.text, "DravenDeltaAdd")
+		else
+			put(" " .. line.text)
+		end
+	end
+
+	float(lines, marks, "full hunk")
+end
+
 ---Show what changed between the version you approved and what is there now.
 ---@param session draven.Session
 ---@param hunk draven.Hunk
 function M.open(session, hunk)
 	local status = session:hunk_state(hunk)
+	if hunk.removed > (config.options.ui.max_inline_deletions or 8) then
+		M.open_hunk(hunk)
+		return
+	end
 
 	if status == "reviewed" then
 		log.info("you have already read this, unchanged since")

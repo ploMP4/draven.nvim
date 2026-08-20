@@ -98,6 +98,8 @@ These are all buffer-local to the review:
 | `<leader>rd` | `delta` | show what changed in a stale hunk since you approved it |
 | `<leader>rc` | `comment` | write a finding on this line, or edit the one here |
 | `<leader>rt` | `toggle_resolved` | toggle the finding resolved |
+| `<leader>rv` | `toggle_finding` | expand or collapse the finding body |
+| `<leader>rX` | `delete_finding` | delete the finding under the cursor |
 | `<leader>rq` | `list_findings` | load all findings into the quickfix list |
 | `<leader>rx` | `export` | copy findings as a prompt for the agent |
 | `<leader>rR` | `refresh` | rebuild from git, keeping every mark |
@@ -114,8 +116,6 @@ The following actions have no default mapping, but can be enabled the same way:
 | --- | --- |
 | `mark_file` / `mark_all` | mark the current file / entire review read |
 | `next_stale` | jump to the next stale hunk |
-| `toggle_finding` | collapse or expand the finding under the cursor |
-| `delete_finding` | delete the finding under the cursor |
 | `next_file` / `prev_file` | move between files |
 | `toggle_fold` | toggle unchanged-code folds |
 | `focus_panel` | focus the changeset panel |
@@ -157,8 +157,12 @@ hunk again:
  -		 return ErrEmpty
  +		 log.Warn("empty token")
  +		 return ErrEmpty.WithContext(r)
-   	 }
+   }
 ```
+
+Large deletion blocks are shortened inline because virtual lines cannot be
+cursor-scrolled when they exceed the window. Their summary points to
+`<leader>rd`, which opens the complete hunk in a normal scrollable buffer.
 
 ### Findings
 
@@ -166,14 +170,17 @@ hunk again:
 mappings, abbreviations and undo all work in it. `<Tab>` cycles through the
 severities, `<C-s>` or `:w` saves, and `<Esc>` throws it away.
 
-Findings are rendered above the line they point at, so a long line cannot hide
-them and a comment that spans several lines still shows in full. If you would
-rather have them at the end of the line, set `ui.finding_display = "eol"`.
+Findings are rendered below the line they point at. New findings start as a
+one-line summary; `<leader>rv` expands one into a clearly separate header and
+wrapped body without covering source lines. Use
+`ui.finding_display = "above"` for the old placement, or `"eol"` for summaries
+at the end of the source line.
 
 They are anchored to a line of code rather than to a line number, so when the
 agent rewrites the file a finding follows the line it was written about. If
 that line is genuinely gone the finding is marked as orphaned, instead of
-being quietly re-pointed at whatever moved into its place.
+being quietly re-pointed at whatever moved into its place. Orphans remain in a
+dedicated panel section: `<CR>` views or edits one, and `<leader>rX` deletes it.
 
 `<leader>rx` (or `:DravenExport`) puts the lot on your clipboard as something
 you can paste straight into an agent:
@@ -271,6 +278,8 @@ require("draven").setup({
     signs = { reviewed = "✓", unread = "○", partial = "◐", ignored = "⊘", hunk = "╎" },
     fold_unchanged = true,
     fold_context = 6,
+    finding_display = "below",
+    max_inline_deletions = 8,
   },
 
   keymaps = {              -- set any entry to false to skip it

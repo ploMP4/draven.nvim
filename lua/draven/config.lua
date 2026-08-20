@@ -23,6 +23,8 @@ local M = {}
 ---@class draven.UiConfig
 ---@field panel draven.PanelConfig
 ---@field signs draven.SignsConfig
+---@field finding_display "below"|"above"|"eol"|false
+---@field max_inline_deletions integer
 ---@field fold_unchanged boolean
 ---@field fold_context integer
 
@@ -120,9 +122,14 @@ local defaults = {
 		-- 0 is opaque. Floats inherit your NormalFloat either way.
 		winblend = 0,
 
-		-- "above" keeps a finding readable no matter how long the line is;
-		-- "eol" is the compact original.
-		finding_display = "above",
+		-- Findings sit below their source line so annotations never obscure the
+		-- code they describe. "above" and "eol" remain available.
+		finding_display = "below",
+
+		-- Virtual lines cannot be cursor-scrolled when a deletion is taller
+		-- than the window. Keep the inline preview bounded; <leader>rd opens
+		-- the complete hunk in a normal scrollable buffer.
+		max_inline_deletions = 8,
 
 		-- Unchanged code folds away so a 900-line file with three hunks reads
 		-- as three hunks. `zR` opens everything, as always.
@@ -154,6 +161,8 @@ local defaults = {
 		list_findings = "<leader>rq",
 		export = "<leader>rx",
 		toggle_resolved = "<leader>rt",
+		toggle_finding = "<leader>rv",
+		delete_finding = "<leader>rX",
 		refresh = "<leader>rR",
 		toggle_panel = "<leader>rw",
 		open_entry = "<CR>",

@@ -159,6 +159,8 @@ closes. Set any of them to `false` in your config to skip it
 	<leader>rc	Write a finding on this line, or edit the one already
 			there. See |draven-findings|.
 	<leader>rt	Toggle the finding under the cursor resolved.
+	<leader>rv	Expand or collapse the finding under the cursor.
+	<leader>rX	Delete the finding under the cursor.
 	<leader>rq	Load findings into the |quickfix| list.
 	<leader>rx	Copy findings as a prompt for your agent.
 
@@ -216,6 +218,10 @@ approved and what is on disk now, which is usually a few lines rather than
 the whole hunk again. That comparison needs the bytes you approved, which
 draven stores when you mark a hunk (|draven-state|).
 
+Long deletion blocks are shortened inline because virtual lines taller than
+the window cannot be cursor-scrolled. Their summary points to `<leader>rd`,
+which opens the complete hunk in a normal scrollable buffer.
+
                                                            *draven-base-moved*
 When the base revision itself moves, because you committed or rebased, every
 recorded old-side address points somewhere else. draven drops them rather
@@ -233,8 +239,13 @@ insert mappings, abbreviations and undo all work.
 	<C-s>  ZZ  :w	Save.
 	<Esc>  q	Discard.
 
-Saved findings appear at the end of the line they point at, and are counted in
-the panel.
+Saved findings appear below the line they point at and are counted in the
+panel. New findings start as a compact one-line summary. `<leader>rv` expands
+one into a distinct header and wrapped body.
+
+Orphaned findings remain under an `orphaned findings` heading in the panel,
+even when their file has left the changeset. Press `<CR>` there to view or
+edit one, or `<leader>rX` to delete it.
 
                                                             *draven-anchoring*
 A finding is anchored to a line of code rather than to a line number, for the
@@ -296,7 +307,8 @@ Defaults shown. Pass any subset to `require("draven").setup()`. >lua
 	    delta   = { max_width = 110, max_height = 30, border = "rounded"},
 	    comment = { width = 76, height = 8, border = "rounded" },
 	    winblend = 0,           -- float transparency
-	    finding_display = "above",  -- or "eol", or false
+	    finding_display = "below",  -- or "above", "eol", or false
+	    max_inline_deletions = 8,
 	    fold_unchanged = true,
 	    fold_context = 6,
 	  },

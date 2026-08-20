@@ -241,6 +241,23 @@ describe("state persistence", function()
 		assert.same({}, session.state.reviewed)
 	end)
 
+	it("migrates the old implicit collapsed state for resolved findings", function()
+		local cs = helpers.build(repo)
+		local path = state_store.path(cs)
+
+		vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
+		vim.fn.writefile({
+			vim.json.encode({
+				version = state_store.VERSION,
+				reviewed = {},
+				findings = { old = { resolved = true } },
+			}),
+		}, path)
+
+		local state = state_store.load(cs)
+		assert.is_true(state.findings.old.collapsed)
+	end)
+
 	it("keeps separate state per revspec", function()
 		repo:commit("second")
 
