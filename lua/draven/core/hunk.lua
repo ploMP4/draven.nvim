@@ -152,11 +152,15 @@ function M.normalize(lines)
 	return out
 end
 
+---The path is length-prefixed rather than separated by a byte, so a path and a
+---body can never run together into the same digest input. A NUL would do the
+---same job, but a Lua string carrying one converts to a Blob on its way into
+---|sha256()|, which older Neovim rejects outright.
 ---@param path string
 ---@param body string
 ---@return string
 function M.hash(path, body)
-	return vim.fn.sha256(path .. "\0" .. body)
+	return vim.fn.sha256(("%d:%s%s"):format(#path, path, body))
 end
 
 ---@param path string
