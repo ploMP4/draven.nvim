@@ -5,7 +5,7 @@
 Review a diff in Neovim, keep your place across rewrites, and export concise,
 structured feedback for the agent.
 
-![draven.nvim demo](demo.gif)
+<img width="860" height="484" alt="demo" src="https://github.com/user-attachments/assets/af71bd2f-74cb-4c80-a083-94b7812b9ce8" />
 
 Reviewing code that an agent wrote is iterative. You read it, you send your
 findings back, it rewrites, and then you read it again, usually three or four
