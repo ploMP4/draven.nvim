@@ -198,28 +198,100 @@ describe("render", function()
 		assert.equals(1, #marks)
 		assert.equals(1, #marks[1].virt_lines)
 		assert.is_truthy(virtual_text(marks[1].virt_lines):find("▸", 1, true))
+		assert.is_truthy(virtual_text(marks[1].virt_lines):find("╰─", 1, true))
 		assert.not_equals(true, marks[1].virt_lines_above)
 	end)
 
-	it("underlines every line covered by a block finding", function()
+	it("wraps every line of a block finding without shifting source", function()
 		local bufnr, file = open("auth/token.go")
 		local item = add_finding(file, "Review this whole block", "blocking", 3)
+		local before = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 
 		render.render(bufnr, file, session, { width = 60 })
 
-		local underline
+		local annotation
+		local rails = {}
+		local inline_counts = {}
 		for _, mark in
 			ipairs(vim.api.nvim_buf_get_extmarks(bufnr, render.ns, 0, -1, { details = true }))
 		do
-			if mark[4].hl_group == "DravenFindingBlockingLine" then
-				underline = mark
+			local details = mark[4]
+			if details.virt_text_pos == "inline" then
+				local lnum = mark[2] + 1
+				inline_counts[lnum] = (inline_counts[lnum] or 0) + 1
+				for _, chunk in ipairs(details.virt_text or {}) do
+					if chunk[2] == "DravenFindingBlocking" then
+						rails[lnum] = vim.trim(chunk[1])
+						assert.equals(2, vim.fn.strdisplaywidth(chunk[1]))
+					end
+				end
+			elseif
+				details.virt_lines
+				and virtual_text(details.virt_lines):find("Review this whole block", 1, true)
+			then
+				annotation = mark
+			end
+		end
+
+		assert.same(before, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+		assert.is_false(vim.bo[bufnr].modified)
+		assert.is_not_nil(annotation)
+		assert.equals(item.lnum + 1, annotation[2], "the card belongs after the selected block")
+		assert.equals("╭", rails[item.lnum])
+		assert.equals("│", rails[item.lnum + 1])
+		assert.equals("│", rails[item.lnum + 2])
+		assert.equals(1, inline_counts[item.lnum])
+		assert.equals(1, inline_counts[item.lnum + 1])
+		assert.equals(1, inline_counts[item.lnum + 2])
+		assert.is_truthy(
+			virtual_text(annotation[4].virt_lines):find(
+				("L%d–%d"):format(item.lnum, item.lnum + 2),
+				1,
+				true
+			)
+		)
+
+		assert.is_false(session:toggle_collapsed(item.id))
+		render.render(bufnr, file, session, { width = 60 })
+		local expanded = finding_marks(bufnr, "Review this whole block")
+		assert.equals(1, #expanded)
+		local expanded_text = virtual_text(expanded[1].virt_lines)
+		assert.is_truthy(expanded_text:find("├─", 1, true))
+		assert.is_truthy(expanded_text:find("╰", 1, true))
+	end)
+
+	it("keeps an above-mode block card attached to the start of its range", function()
+		config.setup({ ui = { finding_display = "above" } })
+		local bufnr, file = open("auth/token.go")
+		local item = add_finding(file, "Block note above", "question", 3)
+
+		render.render(bufnr, file, session, { width = 60 })
+
+		local marks = vim.api.nvim_buf_get_extmarks(bufnr, render.ns, 0, -1, { details = true })
+		local annotation
+		for _, mark in ipairs(marks) do
+			if
+				mark[4].virt_lines
+				and virtual_text(mark[4].virt_lines):find("Block note above", 1, true)
+			then
+				annotation = mark
 				break
 			end
 		end
 
-		assert.is_not_nil(underline)
-		assert.equals(item.lnum - 1, underline[2])
-		assert.equals(item.lnum + 1, underline[4].end_row)
+		assert.is_not_nil(annotation)
+		assert.equals(item.lnum - 1, annotation[2])
+		assert.is_true(annotation[4].virt_lines_above)
+		local rail_end
+		for _, mark in ipairs(marks) do
+			for _, chunk in ipairs(mark[4].virt_text or {}) do
+				if chunk[2] == "DravenFindingQuestion" and vim.trim(chunk[1]) == "╰" then
+					rail_end = mark
+					break
+				end
+			end
+		end
+		assert.is_not_nil(rail_end)
 	end)
 
 	it("expands findings into a distinct wrapped body without losing text", function()
@@ -239,6 +311,8 @@ describe("render", function()
 
 		local text = virtual_text(marks[1].virt_lines)
 		assert.is_truthy(text:find("▾", 1, true))
+		assert.is_truthy(text:find("╭─", 1, true))
+		assert.is_truthy(text:find("╰", 1, true))
 		assert.is_truthy(text:find("final words", 1, true))
 		for _, line in ipairs(vim.split(text, "\n", { plain = true })) do
 			assert.is_true(
@@ -262,6 +336,25 @@ describe("render", function()
 		assert.is_truthy(text:find("Second same-line finding", 1, true))
 	end)
 
+	it("keeps expanded comment cards at a readable configured width", function()
+		config.setup({ ui = { finding = { max_width = 40 } } })
+		local bufnr, file = open("auth/token.go")
+		local item = add_finding(
+			file,
+			"A bounded comment remains easy to scan even when the code window is very wide.",
+			"question"
+		)
+
+		assert.is_false(session:toggle_collapsed(item.id))
+		render.render(bufnr, file, session, { width = 100 })
+
+		local marks = finding_marks(bufnr, "bounded comment")
+		assert.equals(1, #marks)
+		for _, line in ipairs(vim.split(virtual_text(marks[1].virt_lines), "\n", { plain = true })) do
+			assert.is_true(vim.fn.strdisplaywidth(line) <= 40)
+		end
+	end)
+
 	it("allows resolved and eol findings to expand", function()
 		config.setup({ ui = { finding_display = "eol" } })
 		local bufnr, file = open("auth/token.go")
@@ -274,10 +367,10 @@ describe("render", function()
 		local marks = finding_marks(bufnr, "Resolved details can still expand")
 		assert.equals(1, #marks)
 		assert.is_true(#marks[1].virt_lines >= 2)
-		assert.is_truthy(virtual_text(marks[1].virt_lines):find("resolved", 1, true))
+		assert.is_truthy(virtual_text(marks[1].virt_lines):find("RESOLVED", 1, true))
 	end)
 
-	it("renders an orphan at its last line without underlining unrelated code", function()
+	it("renders an orphan without decorating unrelated source", function()
 		local bufnr, file = open("auth/token.go")
 		local item = add_finding(file, "The orphan remains visible", "question")
 		item.lnum = nil
@@ -287,12 +380,14 @@ describe("render", function()
 
 		local marks = finding_marks(bufnr, "The orphan remains visible")
 		assert.equals(1, #marks)
-		assert.is_truthy(virtual_text(marks[1].virt_lines):find("orphaned", 1, true))
+		assert.is_truthy(virtual_text(marks[1].virt_lines):find("ORPHANED", 1, true))
 
 		for _, mark in
 			ipairs(vim.api.nvim_buf_get_extmarks(bufnr, render.ns, 0, -1, { details = true }))
 		do
-			assert.not_equals("DravenFindingQuestionLine", mark[4].hl_group)
+			for _, chunk in ipairs(mark[4].virt_text or {}) do
+				assert.not_equals("DravenFindingQuestion", chunk[2])
+			end
 		end
 	end)
 
@@ -542,10 +637,12 @@ describe("review surface", function()
 
 	it("shows the real file, not a copy of it", function()
 		open_review()
-		local _, view_buf = windows()
+		local _, view_buf, view_win = windows()
 
 		assert.equals("", vim.bo[view_buf].buftype)
 		assert.is_truthy(vim.api.nvim_buf_get_name(view_buf):match("%.go$"))
+		assert.is_truthy(vim.wo[view_win].winbar:find("auth/token.go", 1, true))
+		assert.is_truthy(vim.wo[view_win].winbar:find("DravenWinbarAdd", 1, true))
 	end)
 
 	it("marking a hunk updates the panel and moves on", function()
@@ -668,23 +765,36 @@ describe("review surface", function()
 		helpers.wait_for(function()
 			return vim.api.nvim_buf_get_name(0) == "draven://finding"
 		end, "the block finding composer to open")
+		local float_config = vim.api.nvim_win_get_config(0)
+		assert.equals("win", float_config.relative)
+		local title, footer = {}, {}
+		for _, chunk in ipairs(float_config.title or {}) do
+			title[#title + 1] = chunk[1]
+		end
+		for _, chunk in ipairs(float_config.footer or {}) do
+			footer[#footer + 1] = chunk[1]
+		end
+		local title_text = table.concat(title)
+		assert.is_truthy(title_text:find("New comment", 1, true))
+		assert.is_truthy(title_text:find(("%d-%d"):format(first, first + 1), 1, true))
+		assert.is_truthy(table.concat(footer):find("BLOCKING", 1, true))
 		vim.cmd("stopinsert")
 		vim.api.nvim_buf_set_lines(0, 0, -1, false, { "Review both selected lines" })
 		vim.cmd("write")
 
-		local underline
+		local rails = {}
 		for _, mark in
 			ipairs(vim.api.nvim_buf_get_extmarks(view_buf, render.ns, 0, -1, { details = true }))
 		do
-			if mark[4].hl_group == "DravenFindingBlockingLine" then
-				underline = mark
-				break
+			for _, chunk in ipairs(mark[4].virt_text or {}) do
+				if chunk[2] == "DravenFindingBlocking" then
+					rails[mark[2] + 1] = vim.trim(chunk[1])
+				end
 			end
 		end
 
-		assert.is_not_nil(underline)
-		assert.equals(first - 1, underline[2])
-		assert.equals(first, underline[4].end_row)
+		assert.equals("╭", rails[first])
+		assert.equals("│", rails[first + 1])
 	end)
 
 	it("never maps <CR> into a real file buffer", function()

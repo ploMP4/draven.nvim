@@ -30,12 +30,8 @@ local LINKS = {
 	DravenFindingQuestion = "DiagnosticWarn",
 	DravenFindingNit = "DiagnosticHint",
 	DravenFindingResolved = "NonText",
-	-- The mark on the commented line itself. Underlines rather than
-	-- backgrounds, so the diff's own colours survive underneath.
-	DravenFindingBlockingLine = "DiagnosticUnderlineError",
-	DravenFindingQuestionLine = "DiagnosticUnderlineWarn",
-	DravenFindingNitLine = "DiagnosticUnderlineHint",
-	DravenFindingResolvedLine = "DiagnosticUnderlineOk",
+	DravenFindingText = "NormalFloat",
+	DravenFindingSurface = "NormalFloat",
 
 	-- Floats. NormalFloat is the right thing to follow; a colorscheme that
 	-- wants transparent floats says so there.
@@ -44,7 +40,18 @@ local LINKS = {
 	DravenFloatTitle = "FloatTitle",
 	DravenFloatFooter = "FloatFooter",
 	DravenCommentTitle = "FloatTitle",
+	DravenCommentLocation = "Comment",
+	DravenCommentKey = "Special",
+	DravenCommentMeta = "Comment",
 	DravenCommentHint = "NonText",
+
+	-- Diff window header
+	DravenWinbar = "WinBar",
+	DravenWinbarNC = "WinBarNC",
+	DravenWinbarPath = "Directory",
+	DravenWinbarMeta = "Comment",
+	DravenWinbarAdd = "DiffAdd",
+	DravenWinbarDelete = "DiffDelete",
 
 	-- The v1→v2 delta
 	DravenDeltaAdd = "DiffAdd",

@@ -163,10 +163,22 @@ function Panel:render(session, active_path)
 
 	-- Badges for the two things that want acting on, side by side.
 	local badges, badge_marks = " ", {}
-	if #session:findings({ unresolved_only = true }) > 0 then
-		local n = #session:findings({ unresolved_only = true })
-		badge_marks[#badge_marks + 1] = { col = #badges, len = 0, group = "DravenFindingBlocking" }
-		local text = ("! %d finding%s"):format(n, n == 1 and "" or "s")
+	local unresolved = session:findings({ unresolved_only = true })
+	if #unresolved > 0 then
+		local strongest = "DravenFindingNit"
+		local icon = "◇"
+		for _, item in ipairs(unresolved) do
+			if item.severity == "blocking" then
+				strongest, icon = "DravenFindingBlocking", "●"
+				break
+			elseif item.severity == "question" then
+				strongest, icon = "DravenFindingQuestion", "?"
+			end
+		end
+
+		local n = #unresolved
+		badge_marks[#badge_marks + 1] = { col = #badges, len = 0, group = strongest }
+		local text = ("%s %d comment%s"):format(icon, n, n == 1 and "" or "s")
 		badge_marks[#badge_marks].len = #text
 		badges = badges .. text .. "   "
 	end

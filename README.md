@@ -176,8 +176,11 @@ insert mappings, abbreviations and undo all work in it. `<Tab>` cycles through t
 severities, `<C-s>` or `:w` saves, and `<Esc>` throws it away.
 
 Findings are rendered below the line they point at. New findings start as a
-one-line summary; `<leader>rv` expands one into a clearly separate header and
-wrapped body without covering source lines. Use
+one-line summary; `<leader>rv` expands one into a bordered, wrapped review card
+without covering source lines. The composer opens beside the selected code and
+keeps the comment type, location, and essential actions in its border. Range
+comments wrap the complete selection in the review gutter, show their line
+range in the card, and connect after the final selected line. Use
 `ui.finding_display = "above"` for the old placement, or `"eol"` for summaries
 at the end of the source line.
 
@@ -283,6 +286,7 @@ require("draven").setup({
     signs = { reviewed = "✓", unread = "○", partial = "◐", ignored = "⊘", hunk = "╎" },
     fold_unchanged = true,
     fold_context = 6,
+    finding = { max_width = 96 },
     finding_display = "below",
     max_inline_deletions = 8,
   },

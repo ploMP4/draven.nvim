@@ -13,6 +13,9 @@ local M = {}
 ---@field width integer
 ---@field position "left"|"right"
 
+---@class draven.FindingUiConfig
+---@field max_width integer
+
 ---@class draven.SignsConfig
 ---@field reviewed string
 ---@field unread string
@@ -23,6 +26,7 @@ local M = {}
 ---@class draven.UiConfig
 ---@field panel draven.PanelConfig
 ---@field signs draven.SignsConfig
+---@field finding draven.FindingUiConfig
 ---@field finding_display "below"|"above"|"eol"|false
 ---@field max_inline_deletions integer
 ---@field fold_unchanged boolean
@@ -117,6 +121,12 @@ local defaults = {
 			width = 76,
 			height = 8,
 			border = "rounded",
+		},
+
+		finding = {
+			-- A readable measure keeps long notes from becoming a wall of text
+			-- on wide monitors while narrow splits still use every available cell.
+			max_width = 96,
 		},
 
 		-- 0 is opaque. Floats inherit your NormalFloat either way.

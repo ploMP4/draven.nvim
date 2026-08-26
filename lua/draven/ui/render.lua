@@ -64,7 +64,8 @@ local truncate_display
 ---@param above boolean
 ---@param texts string[]
 ---@param width integer
-local function virtual_deletions(bufnr, lnum, above, texts, width)
+---@param rail? { hl: string }
+local function virtual_deletions(bufnr, lnum, above, texts, width, rail)
 	if #texts == 0 then
 		return
 	end
@@ -77,6 +78,12 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 	-- marker in that same first cell, so the two columns line up.
 	local marker = ("%-2s"):format(signs.delete)
 	local indent = vim.fn.strdisplaywidth(marker)
+	local marker_chunks = rail and {
+		{ "│", rail.hl },
+		{ signs.delete, "DravenMarkerDelete" },
+	} or {
+		{ marker, "DravenMarkerDelete" },
+	}
 
 	local visible = texts
 	local hidden = 0
@@ -92,9 +99,10 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 	local virt_lines = {}
 	for i, text in ipairs(visible) do
 		local pad = math.max(0, width - indent - vim.fn.strdisplaywidth(text))
-		virt_lines[i] = {
-			{ marker, "DravenMarkerDelete" },
-			{ text .. string.rep(" ", pad), "DravenDelete" },
+		virt_lines[i] = vim.deepcopy(marker_chunks)
+		virt_lines[i][#virt_lines[i] + 1] = {
+			text .. string.rep(" ", pad),
+			"DravenDelete",
 		}
 	end
 
@@ -103,10 +111,12 @@ local function virtual_deletions(bufnr, lnum, above, texts, width)
 			hidden,
 			hidden == 1 and "" or "s"
 		)
-		virt_lines[#virt_lines + 1] = {
-			{ marker, "DravenMarkerDelete" },
-			{ truncate_display(summary, math.max(1, width - indent)), "DravenDelete" },
+		local row = vim.deepcopy(marker_chunks)
+		row[#row + 1] = {
+			truncate_display(summary, math.max(1, width - indent)),
+			"DravenDelete",
 		}
+		virt_lines[#virt_lines + 1] = row
 	end
 
 	pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, lnum - 1, 0, {
@@ -175,7 +185,8 @@ M.status_sign = status_sign
 ---@param hunk draven.Hunk
 ---@param status draven.HunkStatus
 ---@param width integer
-local function render_hunk(bufnr, hunk, status, width)
+---@param finding_rails table<integer, { text: string, hl: string, id: string }>
+local function render_hunk(bufnr, hunk, status, width, finding_rails)
 	local signs = config.options.ui.signs
 
 	-- Added lines, in runs.
@@ -190,7 +201,13 @@ local function render_hunk(bufnr, hunk, status, width)
 		if add_first then
 			highlight_range(bufnr, add_first, add_last, "DravenAdd")
 			for lnum = add_first, add_last do
-				inline_marker(bufnr, lnum, add_marker, "DravenMarkerAdd")
+				local rail = finding_rails[lnum]
+				inline_marker(
+					bufnr,
+					lnum,
+					rail and rail.text or add_marker,
+					rail and rail.hl or "DravenMarkerAdd"
+				)
 			end
 			add_first, add_last = nil, nil
 		end
@@ -198,7 +215,14 @@ local function render_hunk(bufnr, hunk, status, width)
 
 	local function flush_deletes(anchor, above)
 		if #deletes > 0 then
-			virtual_deletions(bufnr, anchor, above, deletes, width)
+			local rail
+			if above then
+				local before, after = finding_rails[anchor - 1], finding_rails[anchor]
+				if before and after and before.id == after.id then
+					rail = after
+				end
+			end
+			virtual_deletions(bufnr, anchor, above, deletes, width, rail)
 			deletes = {}
 		end
 	end
@@ -274,7 +298,13 @@ local function render_hunk(bufnr, hunk, status, width)
 	local blank = string.rep(" ", vim.fn.strdisplaywidth(add_marker))
 	for _, line in ipairs(hunk.lines) do
 		if line.kind == "context" and line.new_lnum then
-			inline_marker(bufnr, line.new_lnum, blank, "DravenMarkerContext")
+			local rail = finding_rails[line.new_lnum]
+			inline_marker(
+				bufnr,
+				line.new_lnum,
+				rail and rail.text or blank,
+				rail and rail.hl or "DravenMarkerContext"
+			)
 		end
 	end
 end
@@ -292,17 +322,38 @@ local function finding_highlight(item)
 	})[item.severity] or "DravenFindingBlocking"
 end
 
----@param item draven.Finding
----@return string
-local function finding_underline(item)
-	if item.resolved then
-		return "DravenFindingResolvedLine"
+---@param file draven.File
+---@param session draven.Session
+---@param total integer
+---@param mode "below"|"above"|"eol"|false
+---@return table<integer, { text: string, hl: string, id: string }>
+local function finding_range_rails(file, session, total, mode)
+	local rails = {}
+	if mode == false or mode == "none" then
+		return rails
 	end
-	return ({
-		blocking = "DravenFindingBlockingLine",
-		question = "DravenFindingQuestionLine",
-		nit = "DravenFindingNitLine",
-	})[item.severity] or "DravenFindingBlockingLine"
+
+	for _, item in ipairs(session:findings({ path = file.path })) do
+		local first = finding_mod.display_lnum(item, total)
+		local span = item.lnum and math.max(1, item.span or 1) or 1
+		if first and span > 1 and item.state ~= "orphaned" then
+			local last = math.min(total, first + span - 1)
+			local hl = finding_highlight(item)
+			for lnum = first, last do
+				if not rails[lnum] then
+					local glyph = "│"
+					if mode == "above" and lnum == last then
+						glyph = "╰"
+					elseif mode ~= "above" and lnum == first then
+						glyph = "╭"
+					end
+					rails[lnum] = { text = glyph .. " ", hl = hl, id = item.id }
+				end
+			end
+		end
+	end
+
+	return rails
 end
 
 ---@param text string
@@ -373,57 +424,118 @@ end
 ---@param item draven.Finding
 ---@return string
 local function finding_badge(item)
+	local severity = (item.severity or "blocking"):upper()
+	local span = item.lnum and math.max(1, item.span or 1) or 1
+	local scope = ""
+	if item.lnum then
+		scope = span > 1 and (" · L%d–%d"):format(item.lnum, item.lnum + span - 1)
+			or (" · L%d"):format(item.lnum)
+	end
 	if item.state == "orphaned" then
-		return "⚠ orphaned · " .. item.severity
+		return "⚠ ORPHANED · " .. severity
 	end
 	if item.resolved then
-		return "✓ resolved · " .. item.severity
+		return "✓ RESOLVED · " .. severity .. scope
 	end
-	return item.severity
+
+	local icon = ({ blocking = "●", question = "?", nit = "◇" })[item.severity] or "●"
+	return icon .. " " .. severity .. scope
 end
 
 ---@param item draven.Finding
 ---@param width integer
+---@param mode "below"|"above"|"eol"
 ---@return table[]
-local function finding_rows(item, width)
+local function finding_rows(item, width, mode)
 	local hl = finding_highlight(item)
 	local badge = finding_badge(item)
-	local gutter = "  ▎ "
 	local rows = {}
+	local max_width = config.options.ui.finding and config.options.ui.finding.max_width or 96
+	local available_width = math.max(1, math.min(width, max_width))
+	local headline = finding_mod.headline(item)
+	local block = item.lnum ~= nil and math.max(1, item.span or 1) > 1
+	-- Range cards continue directly from the rail in the second sign slot.
+	-- Single-line findings retain a small inset to separate them from the diff.
+	local indent = block and "" or "  "
 
 	if item.collapsed then
-		local prefix = gutter .. "▸ " .. badge .. " · "
-		local available = math.max(1, width - vim.fn.strdisplaywidth(prefix))
+		local corner = block and mode == "above" and "╭" or "╰"
+		local prefix = indent .. corner .. "─ " .. badge .. "  "
+		local suffix = "  ▸"
+		local fixed = vim.fn.strdisplaywidth(prefix) + vim.fn.strdisplaywidth(suffix)
+		local row_width = math.min(
+			available_width,
+			math.max(math.min(36, available_width), fixed + vim.fn.strdisplaywidth(headline))
+		)
+
+		if row_width <= fixed then
+			rows[1] = { { truncate_display(prefix .. suffix, row_width), hl } }
+			return rows
+		end
+
 		rows[1] = {
-			{ gutter .. "▸ " .. badge .. " · ", hl },
-			{ truncate_display(finding_mod.headline(item), available), "Comment" },
+			{ prefix, hl },
+			{ truncate_display(headline, row_width - fixed), "DravenFindingText" },
+			{ suffix, hl },
 		}
 		return rows
 	end
 
-	rows[1] = {
-		{ gutter .. "▾ " .. badge, hl },
-	}
-
-	local body_width = math.max(1, width - vim.fn.strdisplaywidth(gutter .. "  "))
 	local body = vim.split(vim.trim(item.body or ""), "\n", { plain = true })
+	local widest = vim.fn.strdisplaywidth(badge) + 13
+	for _, line in ipairs(body) do
+		widest = math.max(widest, vim.fn.strdisplaywidth(line) + 8)
+	end
+
+	local card_width = math.min(available_width, math.max(math.min(44, available_width), widest))
+	if card_width < 12 then
+		return { { { truncate_display(badge .. " " .. headline, card_width), hl } } }
+	end
+
+	local header_corner = block and mode ~= "above" and "├" or "╭"
+	local header_start = indent .. header_corner .. "─ "
+	local header_end = " ▾ ╮"
+	local rule_width = card_width
+		- vim.fn.strdisplaywidth(header_start)
+		- vim.fn.strdisplaywidth(badge)
+		- vim.fn.strdisplaywidth(header_end)
+	if rule_width > 0 then
+		local rule = " " .. string.rep("─", rule_width - 1)
+		rows[1] = { { header_start .. badge .. rule .. header_end, hl } }
+	else
+		rows[1] = { { truncate_display(header_start .. badge .. " ▾", card_width), hl } }
+	end
+
+	local body_left, body_right = indent .. "│  ", "  │"
+	local body_width = math.max(
+		1,
+		card_width - vim.fn.strdisplaywidth(body_left) - vim.fn.strdisplaywidth(body_right)
+	)
 	for _, line in ipairs(body) do
 		for _, wrapped in ipairs(wrap_display(line, body_width)) do
+			local pad = math.max(0, body_width - vim.fn.strdisplaywidth(wrapped))
 			rows[#rows + 1] = {
-				{ gutter, hl },
-				{ "  " .. wrapped, "Normal" },
+				{ body_left, hl },
+				{ wrapped, "DravenFindingText" },
+				{ string.rep(" ", pad), "DravenFindingSurface" },
+				{ body_right, hl },
 			}
 		end
 	end
 
+	local bottom_corner = block and mode == "above" and "├" or "╰"
+	local bottom_width = math.max(0, card_width - vim.fn.strdisplaywidth(indent) - 2)
+	rows[#rows + 1] = { { indent .. bottom_corner .. string.rep("─", bottom_width) .. "╯", hl } }
+
 	return rows
 end
 
----Findings underline their source and render as annotations below it. A
----collapsed finding is one compact summary; expanding it always produces a
----separate header and wrapped body, even when the body contains only one line.
----Findings sharing a source line are combined into one virtual block so their
----text never overlaps.
+---Findings mark their source range in the review gutter and render as
+---annotations beside it. A collapsed finding is one compact summary;
+---expanding it produces a bounded review card with a separate header and
+---wrapped body.
+---Findings sharing an annotation anchor are combined into one virtual block so
+---their text never overlaps.
 ---@param bufnr integer
 ---@param file draven.File
 ---@param session draven.Session
@@ -438,55 +550,34 @@ local function render_findings(bufnr, file, session, width)
 	local by_line = {}
 
 	for _, item in ipairs(session:findings({ path = file.path })) do
-		local lnum = finding_mod.display_lnum(item, total)
-		if lnum then
-			by_line[lnum] = by_line[lnum] or {}
-			by_line[lnum][#by_line[lnum] + 1] = item
+		local first = finding_mod.display_lnum(item, total)
+		if first then
+			local span = item.lnum and math.max(1, item.span or 1) or 1
+			local last = math.min(total, first + span - 1)
+			local anchor = mode == "above" and first or last
+			by_line[anchor] = by_line[anchor] or {}
+			by_line[anchor][#by_line[anchor] + 1] = {
+				item = item,
+				first = first,
+				last = last,
+			}
 		end
 	end
 
-	for lnum, items in pairs(by_line) do
-		-- Prefer an unresolved finding for the underline when several share a
-		-- line; lists are severity-sorted, so this also picks the strongest.
-		local primary
-		for _, item in ipairs(items) do
-			if item.state ~= "orphaned" and not item.resolved then
-				primary = item
-				break
-			end
-		end
-		if not primary then
-			for _, item in ipairs(items) do
-				if item.state ~= "orphaned" then
-					primary = item
-					break
-				end
-			end
-		end
-
-		if primary then
-			local last = math.min(total, lnum + math.max(1, primary.span or 1) - 1)
-			local text = vim.api.nvim_buf_get_lines(bufnr, last - 1, last, false)[1] or ""
-			pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns, lnum - 1, 0, {
-				end_row = last - 1,
-				end_col = #text,
-				hl_group = finding_underline(primary),
-				priority = 200,
-			})
-		end
-
+	for lnum, entries in pairs(by_line) do
 		local rows, eol = {}, {}
-		for _, item in ipairs(items) do
+		for _, entry in ipairs(entries) do
+			local item = entry.item
 			if mode == "eol" and item.collapsed then
 				if #eol > 0 then
-					eol[#eol + 1] = { "  ·  ", "Comment" }
+					eol[#eol + 1] = { "   ", "Comment" }
 				end
-				eol[#eol + 1] = {
-					("  ▎ ▸ %s · %s"):format(finding_badge(item), finding_mod.headline(item)),
-					finding_highlight(item),
-				}
+				local item_hl = finding_highlight(item)
+				eol[#eol + 1] = { "  ╰─ " .. finding_badge(item) .. "  ", item_hl }
+				eol[#eol + 1] = { finding_mod.headline(item), "DravenFindingText" }
+				eol[#eol + 1] = { "  ▸", item_hl }
 			else
-				vim.list_extend(rows, finding_rows(item, width))
+				vim.list_extend(rows, finding_rows(item, width, mode))
 			end
 		end
 
@@ -585,11 +676,25 @@ function M.render(bufnr, file, session, opts)
 		return
 	end
 
-	for _, hunk in ipairs(file.hunks) do
-		render_hunk(bufnr, hunk, session:hunk_state(hunk), width)
+	local finding_rails = finding_range_rails(
+		file,
+		session,
+		line_count(bufnr),
+		config.options.ui.finding_display
+	)
+	-- Virtual lines sharing an anchor follow creation order. Below-mode cards
+	-- must close before a trailing deletion, while above-mode cards must sit
+	-- after a leading deletion and immediately beside their first source line.
+	local findings_above = config.options.ui.finding_display == "above"
+	if not findings_above then
+		render_findings(bufnr, file, session, width)
 	end
-
-	render_findings(bufnr, file, session, width)
+	for _, hunk in ipairs(file.hunks) do
+		render_hunk(bufnr, hunk, session:hunk_state(hunk), width, finding_rails)
+	end
+	if findings_above then
+		render_findings(bufnr, file, session, width)
+	end
 
 	-- Always computed, even when folding is off: the window's `foldenable` is
 	-- what decides, so it can be toggled without a re-render.

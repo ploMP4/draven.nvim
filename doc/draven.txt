@@ -244,9 +244,12 @@ work.
 	<C-s>  ZZ  :w	Save.
 	<Esc>  q	Discard.
 
-Saved findings appear below the first line they cover and underline their full
-range. They are counted in the panel. New findings start as a compact one-line
-summary. `<leader>rv` expands one into a distinct header and wrapped body.
+Saved findings appear below the source they cover and are counted in the
+panel. New findings start as a compact one-line summary. `<leader>rv` expands
+one into a bordered, wrapped review card. The composer opens beside the
+selected code and keeps its context and actions in the border. A range comment
+wraps the complete selection in the review gutter, shows its line range in the
+card, and connects after the final selected line.
 
 Orphaned findings remain under an `orphaned findings` heading in the panel,
 even when their file has left the changeset. Press `<CR>` there to view or
@@ -311,6 +314,7 @@ Defaults shown. Pass any subset to `require("draven").setup()`. >lua
 	    },
 	    delta   = { max_width = 110, max_height = 30, border = "rounded"},
 	    comment = { width = 76, height = 8, border = "rounded" },
+	    finding = { max_width = 96 },
 	    winblend = 0,           -- float transparency
 	    finding_display = "below",  -- or "above", "eol", or false
 	    max_inline_deletions = 8,
@@ -378,17 +382,25 @@ like the rest of your editor. All links are `default`, so your own
 	DravenFindingQuestion	DiagnosticWarn
 	DravenFindingNit	DiagnosticHint
 	DravenFindingResolved	NonText
-	DravenFindingBlockingLine	DiagnosticUnderlineError
-	DravenFindingQuestionLine	DiagnosticUnderlineWarn
-	DravenFindingNitLine	DiagnosticUnderlineHint
-	DravenFindingResolvedLine	DiagnosticUnderlineOk
+	DravenFindingText	NormalFloat
+	DravenFindingSurface	NormalFloat
 
 	DravenFloat		NormalFloat
 	DravenFloatBorder	FloatBorder
 	DravenFloatTitle	FloatTitle
 	DravenFloatFooter	FloatFooter
 	DravenCommentTitle	FloatTitle
+	DravenCommentLocation	Comment
+	DravenCommentKey	Special
+	DravenCommentMeta	Comment
 	DravenCommentHint	NonText
+
+	DravenWinbar		WinBar
+	DravenWinbarNC		WinBarNC
+	DravenWinbarPath	Directory
+	DravenWinbarMeta	Comment
+	DravenWinbarAdd		DiffAdd
+	DravenWinbarDelete	DiffDelete
 
 	DravenDeltaAdd		DiffAdd
 	DravenDeltaDelete	DiffDelete

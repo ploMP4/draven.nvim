@@ -146,12 +146,40 @@ function View:_buffer_for(file)
 	return bufnr, false
 end
 
+---@param text string
+---@return string
+local function statusline_escape(text)
+	return (text:gsub("%%", "%%%%"))
+end
+
 ---@param win integer
-local function apply_window_options(win)
+---@param file draven.File
+local function apply_window_options(win, file)
 	local ui = config.options.ui
 
 	vim.wo[win].signcolumn = "yes:2"
 	vim.wo[win].wrap = false
+	vim.wo[win].winhighlight = "WinBar:DravenWinbar,WinBarNC:DravenWinbarNC"
+
+	local status = file.untracked and "untracked" or file.status
+	local path = file.old_path
+		and (statusline_escape(file.path) .. " ← " .. statusline_escape(file.old_path))
+		or statusline_escape(file.path)
+	vim.wo[win].winbar = table.concat({
+		"%#DravenWinbar#  ",
+		"%#DravenWinbarPath#",
+		path,
+		"%<",
+		"%#DravenWinbarMeta#  · ",
+		status,
+		"%=",
+		"%#DravenWinbarAdd#+",
+		tostring(file.added or 0),
+		"  ",
+		"%#DravenWinbarDelete#-",
+		tostring(file.removed or 0),
+		"  ",
+	})
 
 	vim.wo[win].foldmethod = "expr"
 	vim.wo[win].foldexpr = "v:lua.require'draven.ui.render'.foldexpr()"
@@ -192,8 +220,10 @@ function View:show(file, opts)
 
 		-- Decorate first: setting `foldexpr` makes Neovim evaluate it straight
 		-- away, and it must see fold levels that already exist.
+		vim.wo[self.win].signcolumn = "yes:2"
+		vim.wo[self.win].wrap = false
 		self:redraw()
-		apply_window_options(self.win)
+		apply_window_options(self.win, file)
 
 		local lnum = opts.lnum
 		if not lnum and opts.hunk then
@@ -227,8 +257,12 @@ function View:redraw()
 		return
 	end
 
-	local width = vim.api.nvim_win_is_valid(self.win) and vim.api.nvim_win_get_width(self.win)
-		or vim.o.columns
+	local width = vim.o.columns
+	if vim.api.nvim_win_is_valid(self.win) then
+		width = vim.api.nvim_win_get_width(self.win)
+		local info = vim.fn.getwininfo(self.win)[1]
+		width = math.max(1, width - (info and info.textoff or 0))
+	end
 
 	render.render(self.bufnr, self.file, self.session, {
 		width = width,
